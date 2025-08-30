@@ -38,20 +38,16 @@ export const getStockItems = () => fetchApi('/stock_items');
 export const addStockItem = (data) => fetchApi('/stock_items', { method: 'POST', body: JSON.stringify(data) });
 export const updateStockItem = (stockId, data) => fetchApi(`/stock_items/${stockId}`, { method: 'PUT', body: JSON.stringify(data) });
 
-// Lending Record APIs
-export const getLentRecords = () => fetchApi('/lent-records');
-export const getLentRecordById = (recordId) => fetchApi(`/lent-records/${recordId}`);
-export const createLendingRecord = (data) => fetchApi('/lent-records', { method: 'POST', body: JSON.stringify(data) });
-export const updateLentRecord = (recordId, data) => fetchApi(`/lent-records/${recordId}`, { method: 'PUT', body: JSON.stringify(data) });
-export const getRecordTransactions = (recordId) => fetchApi(`/lent-records/${recordId}/transactions`);
-export const getRecordFinancials = (recordId) => fetchApi(`/lent-records/${recordId}/financials`);
-export const returnStock = (recordId, returned_stock) => fetchApi(`/lent-records/${recordId}/return-stock`, { method: 'POST', body: JSON.stringify({ returned_stock }) });
-export const closeLendingRecord = (recordId, data) => fetchApi(`/lent-records/${recordId}/close`, { method: 'POST', body: JSON.stringify(data) });
+// Order APIs
+export const getOrders = (status) => fetchApi(`/orders?status=${status || ''}`);
+export const getOrderById = (orderId) => fetchApi(`/orders/${orderId}`);
+export const createOrder = (data) => fetchApi('/orders', { method: 'POST', body: JSON.stringify(data) });
+export const completeOrder = (orderId, data) => fetchApi(`/orders/${orderId}/complete`, { method: 'POST', body: JSON.stringify(data) });
+export const getOrderTransactions = (orderId) => fetchApi(`/orders/${orderId}/transactions`);
+export const getOrderFinancials = (orderId) => fetchApi(`/orders/${orderId}/financials`);
+export const getOrderPayments = (orderId) => fetchApi(`/orders/${orderId}/payments`);
+export const addPaymentToOrder = (orderId, contractor_id, amount, notes) => fetchApi(`/orders/${orderId}/payment`, { method: 'POST', body: JSON.stringify({ contractor_id, amount, notes }) });
 
-// Payment API
-export const addPayment = (data) => fetchApi(`/payments`, { method: 'POST', body: JSON.stringify(data) });
-export const getPaymentsByRecord = (recordId) => fetchApi(`/lent-records/${recordId}/payments`);
-
-// Report APIs -- NEW
-export const getCurrentlyHeldStockReport = () => fetchApi('/stock-reports/currently-held');
-export const getTotalIssuedHistoryReport = () => fetchApi('/stock-reports/issue-history');
+// General Payment API (not tied to a specific order)
+// --- THIS IS THE FIX ---
+export const addGeneralPayment = (data) => fetchApi('/payments', { method: 'POST', body: JSON.stringify(data) });

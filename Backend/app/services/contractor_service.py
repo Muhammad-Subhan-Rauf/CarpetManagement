@@ -22,7 +22,7 @@ def add_contractor(name, contact_info):
 def get_contractor_details(contractor_id):
     """
     Gets all financial and transaction details for a single contractor.
-    --- MODIFIED TO ADD NEW LEDGER SUMMARIES ---
+    --- MODIFIED TO WORK WITH THE NEW UNIFIED 'ORDERS' SYSTEM ---
     """
     db = get_db()
     
@@ -30,106 +30,86 @@ def get_contractor_details(contractor_id):
     if not contractor:
         return None
 
-    # ... (lent_records_query and processing remains the same)
-    lent_records_query = """
+    # Query all orders for the contractor and calculate their financial state
+    orders_query = """
         SELECT
-            lr.LentRecordID,
-            lr.DateIssued,
-            lr.Status,
-            lr.Notes,
-            (SELECT GROUP_CONCAT(DISTINCT si.Quality) 
-             FROM StockTransactions st JOIN StockItems si ON st.StockID = si.StockID 
-             WHERE st.LentRecordID = lr.LentRecordID AND st.TransactionType = 'Issued') as Qualities,
+            o.OrderID,
+            o.DesignNumber,
+            o.DateIssued,
+            o.Status,
+            o.Notes,
             
             (SELECT IFNULL(SUM(st.WeightKg * st.PricePerKgAtTimeOfTransaction), 0)
              FROM StockTransactions st
-             WHERE st.LentRecordID = lr.LentRecordID AND st.TransactionType = 'Issued') as IssuedValue,
+             WHERE st.OrderID = o.OrderID AND st.TransactionType = 'Issued') as IssuedValue,
             
             (SELECT IFNULL(SUM(st.WeightKg * st.PricePerKgAtTimeOfTransaction), 0)
              FROM StockTransactions st
-             WHERE st.LentRecordID = lr.LentRecordID AND st.TransactionType = 'Returned') as ReturnedValue,
+             WHERE st.OrderID = o.OrderID AND st.TransactionType = 'Returned') as ReturnedValue,
 
             (SELECT IFNULL(SUM(p.Amount), 0)
              FROM Payments p
-             WHERE p.LentRecordID = lr.LentRecordID) as AmountPaid
+             WHERE p.OrderID = o.OrderID) as AmountPaid
              
-        FROM LentRecords lr
-        WHERE lr.ContractorID = ?
+        FROM Orders o
+        WHERE o.ContractorID = ?
+        ORDER BY o.DateIssued DESC
     """
-    lent_records_raw = db.execute(lent_records_query, (contractor_id,)).fetchall()
+    orders_raw = db.execute(orders_query, (contractor_id,)).fetchall()
     
-    processed_records = []
-    for record in lent_records_raw:
+    processed_orders = []
+    for record in orders_raw:
         r_dict = dict(record)
         net_value = r_dict['IssuedValue'] - r_dict['ReturnedValue']
         amount_owed = net_value - r_dict['AmountPaid']
         r_dict['AmountOwed'] = round(amount_owed, 2)
-        if r_dict['Qualities'] is None:
-            r_dict['Qualities'] = 'N/A'
-        processed_records.append(r_dict)
+        processed_orders.append(r_dict)
     
-    processed_records.sort(key=lambda r: (r['Qualities'] == 'N/A', r['Qualities']))
-
-    # ... (transactions and payments queries remain the same)
+    # Get all transactions for this contractor across all their orders
     transactions = db.execute("""
         SELECT st.*, si.Type, si.Quality, si.ColorShadeNumber FROM StockTransactions st
-        JOIN LentRecords lr ON st.LentRecordID = lr.LentRecordID
+        JOIN Orders o ON st.OrderID = o.OrderID
         JOIN StockItems si ON st.StockID = si.StockID
-        WHERE lr.ContractorID = ? ORDER BY st.TransactionID
+        WHERE o.ContractorID = ? ORDER BY st.TransactionID DESC
     """, (contractor_id,)).fetchall()
 
+    # Get all payments for this contractor (both general and order-specific)
     payments = db.execute(
         "SELECT * FROM Payments WHERE ContractorID = ? ORDER BY PaymentDate DESC",
         (contractor_id,)
     ).fetchall()
     
-    # --- NEW: Ledger for stock currently held by contractor (from 'Open' records) ---
+    # Ledger for stock currently held by contractor (from 'Open' orders)
     currently_held_stock = db.execute("""
         SELECT 
-            si.Type, 
-            si.Quality, 
-            si.ColorShadeNumber,
+            si.Type, si.Quality, si.ColorShadeNumber,
             SUM(CASE WHEN st.TransactionType = 'Issued' THEN st.WeightKg ELSE -st.WeightKg END) as NetWeightKg
         FROM StockTransactions st
-        JOIN LentRecords lr ON st.LentRecordID = lr.LentRecordID
+        JOIN Orders o ON st.OrderID = o.OrderID
         JOIN StockItems si ON st.StockID = si.StockID
-        WHERE lr.ContractorID = ? AND lr.Status = 'Open'
+        WHERE o.ContractorID = ? AND o.Status = 'Open'
         GROUP BY st.StockID
         HAVING NetWeightKg > 0.001
     """, (contractor_id,)).fetchall()
 
-    # --- NEW: Ledger for total stock ever issued to contractor ---
-    total_issued_history = db.execute("""
-        SELECT 
-            si.Type, 
-            si.Quality, 
-            si.ColorShadeNumber,
-            SUM(st.WeightKg) as TotalIssuedKg
-        FROM StockTransactions st
-        JOIN LentRecords lr ON st.LentRecordID = lr.LentRecordID
-        JOIN StockItems si ON st.StockID = si.StockID
-        WHERE lr.ContractorID = ? AND st.TransactionType = 'Issued'
-        GROUP BY st.StockID
-    """, (contractor_id,)).fetchall()
-
-    # ... (financial_summary calculation remains the same)
-    issued_value = sum(r['IssuedValue'] for r in processed_records)
-    returned_value = sum(r['ReturnedValue'] for r in processed_records)
-    total_paid = sum(p['Amount'] for p in payments)
-    amount_owed_to_contractor = issued_value - returned_value - total_paid
+    # Calculate the overall financial summary
+    total_issued_value = sum(r['IssuedValue'] for r in processed_orders)
+    total_returned_value = sum(r['ReturnedValue'] for r in processed_orders)
+    total_paid = sum(p['Amount'] for p in payments) # Sums ALL payments
+    net_work_value = total_issued_value - total_returned_value
+    final_balance_owed = net_work_value - total_paid
 
     return {
         "contractor": dict(contractor),
-        "lent_records": processed_records,
+        "orders": processed_orders, # Renamed from lent_records
         "transactions": [dict(t) for t in transactions],
         "payments": [dict(p) for p in payments],
-        "currently_held_stock": [dict(row) for row in currently_held_stock], # NEW
-        "total_issued_history": [dict(row) for row in total_issued_history], # NEW
+        "currently_held_stock": [dict(row) for row in currently_held_stock],
         "financial_summary": {
-            "total_value_issued": round(issued_value, 2),
-            "total_value_returned": round(returned_value, 2),
-            "net_work_value": round(issued_value - returned_value, 2),
+            "total_value_issued": round(total_issued_value, 2),
+            "total_value_returned": round(total_returned_value, 2),
+            "net_work_value": round(net_work_value, 2),
             "total_paid": round(total_paid, 2),
-            "final_balance_owed": round(amount_owed_to_contractor, 2)
+            "final_balance_owed": round(final_balance_owed, 2)
         }
     }

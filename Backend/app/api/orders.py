@@ -1,3 +1,5 @@
+# Original relative path: app/api/orders.py
+
 # /app/api/orders.py
 from flask import Blueprint, jsonify, request
 from app.services import order_service
@@ -13,12 +15,13 @@ def handle_orders():
             return jsonify({"error": "Missing required fields"}), 400
         
         result = order_service.create_order(data)
-        if result['success']:
+        if result.get('success'):
             return jsonify({"message": "Order created", "OrderID": result['OrderID']}), 201
         else:
-            return jsonify({"error": result['error']}), 400
+            return jsonify({"error": result.get('error', 'Unknown error')}), 400
     
-    orders = order_service.get_all_orders()
+    status = request.args.get('status') # e.g., 'Open' or 'Closed'
+    orders = order_service.get_all_orders(status=status)
     return jsonify(orders)
 
 @orders_bp.route('/orders/<int:order_id>', methods=['GET'])
@@ -48,17 +51,19 @@ def handle_get_financials(order_id):
 @orders_bp.route('/orders/<int:order_id>/payment', methods=['POST'])
 def handle_add_payment(order_id):
     data = request.get_json()
-    if 'amount' not in data:
-        return jsonify({"error": "Missing 'amount' field"}), 400
+    if 'amount' not in data or 'contractor_id' not in data:
+        return jsonify({"error": "Missing 'amount' or 'contractor_id' field"}), 400
     
     amount = float(data['amount'])
-    notes = data.get('notes', '') # Get optional notes
-    result = order_service.add_payment_to_order(order_id, amount, notes)
+    notes = data.get('notes', '')
+    contractor_id = data['contractor_id']
+    
+    result = order_service.add_payment_to_order(order_id, contractor_id, amount, notes)
 
-    if result['success']:
+    if result.get('success'):
         return jsonify({"message": "Payment added successfully"}), 200
     else:
-        return jsonify({"error": result['error']}), 400
+        return jsonify({"error": result.get('error', 'Unknown error')}), 400
 
 @orders_bp.route('/orders/<int:order_id>/complete', methods=['POST'])
 def handle_complete_order(order_id):
@@ -67,7 +72,7 @@ def handle_complete_order(order_id):
         return jsonify({"error": "Missing 'dateCompleted' field"}), 400
     
     result = order_service.complete_order(order_id, data)
-    if result['success']:
+    if result.get('success'):
         return jsonify({"message": "Order completed successfully"}), 200
     else:
-        return jsonify({"error": result['error']}), 400
+        return jsonify({"error": result.get('error', 'Unknown error')}), 400

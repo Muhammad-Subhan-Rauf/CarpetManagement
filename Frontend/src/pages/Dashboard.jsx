@@ -1,12 +1,14 @@
+// Original relative path: src/pages/Dashboard.jsx
+
 // src/pages/Dashboard.jsx
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getLentRecords } from '../services/api';
+import { getOrders } from '../services/api'; // Changed from getLentRecords to getOrders
 import Card from '../components/Card';
 
 const Dashboard = () => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [allRecords, setAllRecords] = useState([]);
+    const [openOrders, setOpenOrders] = useState([]); // Renamed from allRecords
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -14,8 +16,9 @@ const Dashboard = () => {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const recordsData = await getLentRecords();
-                setAllRecords(recordsData);
+                // Fetch only 'Open' orders for the dashboard
+                const ordersData = await getOrders('open'); 
+                setOpenOrders(ordersData);
                 setError(null);
             } catch (err) {
                 setError(err.message);
@@ -27,12 +30,13 @@ const Dashboard = () => {
         fetchData();
     }, []);
 
-    const filteredRecords = useMemo(() => {
-        return allRecords.filter(record =>
-            record.ContractorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (record.Notes && record.Notes.toLowerCase().includes(searchTerm.toLowerCase()))
+    const filteredOrders = useMemo(() => {
+        return openOrders.filter(order =>
+            order.ContractorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            order.DesignNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (order.Notes && order.Notes.toLowerCase().includes(searchTerm.toLowerCase()))
         );
-    }, [searchTerm, allRecords]);
+    }, [searchTerm, openOrders]);
 
     if (loading) return <div>Loading dashboard...</div>;
     if (error) return <div style={{ color: 'red' }}>Error: {error}</div>;
@@ -40,33 +44,34 @@ const Dashboard = () => {
     return (
         <div>
             <div className="page-header-actions">
-                <h1>Lending Records Dashboard</h1>
-                <Link to="/new-lending" className="button">Lend Stock to Contractor</Link>
+                <h1>Open Orders</h1>
+                <Link to="/new-order" className="button">Create New Carpet Order</Link>
             </div>
             <div className="search-bar">
                 <input
                     type="text"
-                    placeholder="Search by Contractor Name or Notes..."
+                    placeholder="Search by Contractor, Design Number, or Notes..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
             </div>
             <div className="record-list">
-                {filteredRecords.length > 0 ? filteredRecords.map(record => (
-                    <Card key={record.LentRecordID}>
+                {filteredOrders.length > 0 ? filteredOrders.map(order => (
+                    <Card key={order.OrderID}>
                         <div className="record-summary">
                             <div>
-                                <h3>{record.ContractorName}</h3>
-                                <p><strong>Lent on:</strong> {record.DateIssued}</p>
-                                <p><strong>Notes:</strong> {record.Notes || 'N/A'}</p>
-                                <p><strong>Status:</strong> {record.Status}</p>
+                                <h3>{order.DesignNumber}</h3>
+                                <p><strong>Contractor:</strong> {order.ContractorName}</p>
+                                <p><strong>Issued on:</strong> {order.DateIssued}</p>
+                                <p><strong>Notes:</strong> {order.Notes || 'N/A'}</p>
                             </div>
-                            <Link to={`/lending-record/${record.LentRecordID}`} className="button">
+                            {/* Link points to the unified OrderDetails page */}
+                            <Link to={`/order/${order.OrderID}`} className="button">
                                 View Details
                             </Link>
                         </div>
                     </Card>
-                )) : <p>No lending records found.</p>}
+                )) : <p>No open orders found.</p>}
             </div>
         </div>
     );

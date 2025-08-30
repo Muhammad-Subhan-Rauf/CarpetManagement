@@ -7,16 +7,13 @@ from flask_cors import CORS
 from .database import db
 from .api.contractors import contractors_bp
 from .api.stock import stock_bp
-from .api.lendings import lendings_bp
-from .api.stock_reports import stock_reports_bp # NEW
+from .api.orders import orders_bp
+from .api.payments import payments_bp # --- ADD THIS LINE ---
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-    # --- THIS IS THE FIX ---
-    # Load configuration from the 'config' module (config.py)
-    # This is more reliable than using from_pyfile with your structure.
     app.config.from_object('config')
 
     # Initialize extensions
@@ -25,7 +22,7 @@ def create_app(test_config=None):
     # Register blueprints
     app.register_blueprint(contractors_bp, url_prefix='/api')
     app.register_blueprint(stock_bp, url_prefix='/api')
-    app.register_blueprint(lendings_bp, url_prefix='/api')
-    app.register_blueprint(stock_reports_bp, url_prefix='/api') # NEW
+    app.register_blueprint(orders_bp, url_prefix='/api')
+    app.register_blueprint(payments_bp, url_prefix='/api') # --- ADD THIS LINE ---
 
     return app

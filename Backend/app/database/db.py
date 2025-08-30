@@ -32,7 +32,7 @@ def init_db():
             ContactInfo TEXT
         );
 
-        -- StockItems table simplified (IdentifyingNumber removed)
+        -- StockItems table remains the same
         CREATE TABLE IF NOT EXISTS StockItems (
             StockID INTEGER PRIMARY KEY AUTOINCREMENT, 
             Type TEXT NOT NULL, 
@@ -43,44 +43,49 @@ def init_db():
             CONSTRAINT uq_stock_item UNIQUE (Type, Quality, ColorShadeNumber)
         );
 
-        -- Orders table is now LentRecords, with new penalty fields
-        CREATE TABLE IF NOT EXISTS LentRecords (
-            LentRecordID INTEGER PRIMARY KEY AUTOINCREMENT, 
-            ContractorID INTEGER NOT NULL, 
+        -- Orders table is now the central table for all work
+        CREATE TABLE IF NOT EXISTS Orders (
+            OrderID INTEGER PRIMARY KEY AUTOINCREMENT,
+            ContractorID INTEGER NOT NULL,
+            DesignNumber TEXT NOT NULL,
+            ShadeCard TEXT,
+            Quality TEXT, -- Carpet Quality e.g., "60x60"
+            Size TEXT, -- Carpet Size e.g., "8x10 ft"
             DateIssued TEXT NOT NULL,
-            DateDue TEXT, 
+            DateDue TEXT,
+            DateCompleted TEXT, -- This is set when the order is closed
             PenaltyPerDay REAL NOT NULL DEFAULT 0,
             Notes TEXT,
             Status TEXT NOT NULL DEFAULT 'Open', -- 'Open' or 'Closed'
             FOREIGN KEY (ContractorID) REFERENCES Contractors(ContractorID)
         );
 
-        -- OrderStockTransactions is now StockTransactions, links to LentRecords
+        -- StockTransactions now links directly to Orders
         CREATE TABLE IF NOT EXISTS StockTransactions (
             TransactionID INTEGER PRIMARY KEY AUTOINCREMENT, 
-            LentRecordID INTEGER NOT NULL, 
+            OrderID INTEGER NOT NULL, 
             StockID INTEGER NOT NULL,
             TransactionType TEXT NOT NULL CHECK(TransactionType IN ('Issued', 'Returned')),
             WeightKg REAL NOT NULL, 
             PricePerKgAtTimeOfTransaction REAL NOT NULL,
-            Notes TEXT, -- NEW: To mark 'Kept by contractor' etc.
-            FOREIGN KEY (LentRecordID) REFERENCES LentRecords(LentRecordID),
+            Notes TEXT, -- e.g., 'Returned to inventory', 'Kept by contractor'
+            FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
             FOREIGN KEY (StockID) REFERENCES StockItems(StockID)
         );
 
-        -- Payments table now links to LentRecords
+        -- Payments now links directly to Orders
         CREATE TABLE IF NOT EXISTS Payments (
             PaymentID INTEGER PRIMARY KEY AUTOINCREMENT,
-            LentRecordID INTEGER, -- Can be null for general payments to contractor
+            OrderID INTEGER, -- Can be null for general payments to a contractor not tied to an order
             ContractorID INTEGER NOT NULL,
             PaymentDate TEXT NOT NULL,
             Amount REAL NOT NULL,
             Notes TEXT,
-            FOREIGN KEY (LentRecordID) REFERENCES LentRecords(LentRecordID),
+            FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
             FOREIGN KEY (ContractorID) REFERENCES Contractors(ContractorID)
         );
     ''')
-    print("Database schema initialized with new structure.")
+    print("Database schema simplified and initialized.")
 
 @click.command('init-db')
 @with_appcontext

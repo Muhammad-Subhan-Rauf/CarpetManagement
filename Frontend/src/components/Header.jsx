@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FaWarehouse, FaClipboardList, FaUsers, FaChartPie } from 'react-icons/fa'; // MODIFIED
+import { FaWarehouse, FaClipboardList, FaUsers, FaCheckDouble } from 'react-icons/fa';
 
 const Header = () => {
   return (
@@ -23,17 +23,10 @@ const Header = () => {
           <FaWarehouse />
           <span>Inventory</span>
         </Link>
-        {/* --- THIS IS THE FIX --- */}
-        <div className="nav-dropdown">
-          <div className="nav-link">
-            <FaChartPie />
-            <span>Reports</span>
-          </div>
-          <div className="dropdown-content">
-            <Link to="/reports/currently-held">Currently Held Stock</Link>
-            <Link to="/reports/total-issued">Total Issued History</Link>
-          </div>
-        </div>
+        <Link to="/closed-deals" className="nav-link">
+          <FaCheckDouble />
+          <span>Closed Deals</span>
+        </Link>
       </nav>
     </header>
   );
