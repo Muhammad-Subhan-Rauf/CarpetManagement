@@ -7,13 +7,11 @@ import { getOrderById, getOrderFinancials, getOrderTransactions, getOrderPayment
 import Card from '../components/Card';
 import Modal from '../components/Modal';
 
-// --- THIS IS THE FIX (1/2): The component now accepts 'transactions' as a prop ---
 const CompleteOrderModal = ({ isOpen, onClose, order, transactions, onConfirm }) => {
     const [reconciliation, setReconciliation] = useState({});
     const [finalPayment, setFinalPayment] = useState('');
     const [completionDate, setCompletionDate] = useState(new Date().toISOString().split('T')[0]);
 
-    // This calculation now works because 'transactions' is received as a prop.
     const outstandingStock = useMemo(() => {
         const summary = {};
         if (transactions) {
@@ -36,7 +34,6 @@ const CompleteOrderModal = ({ isOpen, onClose, order, transactions, onConfirm })
     };
     
     const handleSubmit = () => {
-        // Validation can be added here to ensure returned/kept weight doesn't exceed outstanding
         onConfirm({ 
             dateCompleted: completionDate,
             reconciliation: Object.entries(reconciliation).map(([stockId, weights]) => ({ 
@@ -183,7 +180,9 @@ const OrderDetails = () => {
                     <div className="financial-item"><span>Total Paid:</span> <span>Rs {financials.AmountPaid.toFixed(2)}</span></div>
                     <div className="financial-item pending"><span>CURRENTLY PENDING:</span> <span>Rs {financials.AmountPending.toFixed(2)}</span></div>
                     
-                    {order.Status === 'Open' && financials.AmountPending > 0.01 && (
+                    {/* --- THIS IS THE FIX --- */}
+                    {/* The button now ONLY checks if there is a pending amount, regardless of order status. */}
+                    {financials.AmountPending > 0.01 && (
                         <div style={{marginTop: '1.5rem', borderTop: '1px solid #eee', paddingTop: '1.5rem'}}>
                             <button className="button" style={{width: '100%'}} onClick={() => setIsPaymentModalOpen(true)}>Make a Payment</button>
                         </div>
@@ -212,7 +211,6 @@ const OrderDetails = () => {
                 isOpen={isCompleteModalOpen}
                 onClose={() => setIsCompleteModalOpen(false)}
                 order={order}
-                // --- THIS IS THE FIX (2/2): Pass the 'transactions' state into the modal ---
                 transactions={transactions}
                 onConfirm={handleConfirmCompletion}
             />
