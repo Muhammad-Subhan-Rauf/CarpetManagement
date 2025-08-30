@@ -1,0 +1,6 @@
+# requirements.txt
+
+Flask>=2.3.0
+Flask-Cors
+pandas
+openpyxl

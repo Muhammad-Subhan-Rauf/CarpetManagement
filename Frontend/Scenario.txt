@@ -1,0 +1,27 @@
+contractors are payed wages for their work. 
+
+the wages are decided upon the size/quality and how much stock was used in the carpet
+
+the price of the carpet is the wage of the contractor. 
+
+contractors can incur fines based on delayed payments (fine decided by user)
+
+scenario:
+    contractor comes to buy 5kg of wool and 5kg of silk at 50rs and 80rs respectively
+    his wage is now 5*50 + 5*80 = 650
+    lets say he only ended up using 5kg of wool and 2 kg of silk in the carpet
+    the contractor can either return the remaining carpet or the price of the remaining carpet will be cut from price (650 - 3*80 = 410)
+    if the contractor returns the stock, the stock will be added back to the inventory and the price will be cut same as before
+
+scenario 2:
+    lets say contractor delayes the cartpet by 5 days, then the user can enter penelty per day lets say 5rs per day
+    the contractor will be fined 25rs and that amount will be cut from his price/wage
+
+
+we need to store how much stock the contractor has taken from us
+
+the stock will be organized by the quality and the type of the stock
+
+search functionality based on shade card / design number
+
+inventory management (user can manually add subtract stock aswell)

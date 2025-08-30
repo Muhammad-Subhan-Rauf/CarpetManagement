@@ -1,0 +1,33 @@
+{
+    "Contractors": [
+        {
+            "Name": "",
+            "amount pending": 0,
+            "orders": [
+                {
+                    "date": {
+                        "start Date": "some date",
+                        "End Date": "some date"
+                    },
+                    "fine": 0,
+                    "carpet": {
+                        "Quality": "String",
+                        "Size": "String W x H",
+                        "Price (Price per KG * weight in KG of all stock, customizable however by user)": 0,
+                        "Stock Number": {
+                            "Design Number": "Alphanumeric string",
+                            "Shade Card": 0
+                        },
+                        "stock": [
+                            {
+                                "type": "wool / silk / tani / butka",
+                                "Price per kg": 0,
+                                "weight in kg": 0
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    ]
+}

@@ -1,3 +1,6 @@
+# --------------------
+# Node.js
+# --------------------
 # Logs
 logs
 *.log
@@ -67,7 +70,7 @@ web_modules/
 
 # dotenv environment variable files
 .env
-.env.*
+.env.* 
 !.env.example
 
 # parcel-bundler cache (https://parceljs.org/)
@@ -84,8 +87,6 @@ dist
 
 # Gatsby files
 .cache/
-# Comment in the public line in if your project uses Gatsby and not Next.js
-# https://nextjs.org/blog/next-9-1#public-directory-support
 # public
 
 # vuepress build output
@@ -137,3 +138,29 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+
+# --------------------
+# Python
+# --------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+env/
+venv/
+ENV/
+.venv/
+
+# Distribution / packaging
+*.egg-info/
+.eggs/
+build/
+develop-eggs/
+dist/
+# Ignore inventory files
+inventory_data.xlsx
+inventory.db
