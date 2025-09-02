@@ -2,7 +2,7 @@
 
 // src/services/api.js
 
-const API_BASE_URL = 'http://127.0.0.1:5001/api';
+const API_BASE_URL = 'http://127.0.0.1:55000/api';
 
 async function fetchApi(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
