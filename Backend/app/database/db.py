@@ -25,14 +25,14 @@ def init_db():
     db = get_db()
     
     db.executescript('''
-        -- Contractors table remains the same
+        -- Contractors table
         CREATE TABLE IF NOT EXISTS Contractors (
             ContractorID INTEGER PRIMARY KEY AUTOINCREMENT, 
             Name TEXT NOT NULL, 
             ContactInfo TEXT
         );
 
-        -- StockItems table remains the same
+        -- StockItems table
         CREATE TABLE IF NOT EXISTS StockItems (
             StockID INTEGER PRIMARY KEY AUTOINCREMENT, 
             Type TEXT NOT NULL, 
@@ -43,7 +43,7 @@ def init_db():
             CONSTRAINT uq_stock_item UNIQUE (Type, Quality, ColorShadeNumber)
         );
 
-        -- Orders table is now the central table for all work
+        -- Orders table is the central table for all work
         CREATE TABLE IF NOT EXISTS Orders (
             OrderID INTEGER PRIMARY KEY AUTOINCREMENT,
             ContractorID INTEGER NOT NULL,
@@ -60,7 +60,7 @@ def init_db():
             FOREIGN KEY (ContractorID) REFERENCES Contractors(ContractorID)
         );
 
-        -- StockTransactions now links directly to Orders
+        -- StockTransactions links directly to Orders
         CREATE TABLE IF NOT EXISTS StockTransactions (
             TransactionID INTEGER PRIMARY KEY AUTOINCREMENT, 
             OrderID INTEGER NOT NULL, 
@@ -68,15 +68,15 @@ def init_db():
             TransactionType TEXT NOT NULL CHECK(TransactionType IN ('Issued', 'Returned')),
             WeightKg REAL NOT NULL, 
             PricePerKgAtTimeOfTransaction REAL NOT NULL,
-            Notes TEXT, -- e.g., 'Returned to inventory', 'Kept by contractor'
+            Notes TEXT,
             FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
             FOREIGN KEY (StockID) REFERENCES StockItems(StockID)
         );
 
-        -- Payments now links directly to Orders
+        -- Payments links to Orders or can be general
         CREATE TABLE IF NOT EXISTS Payments (
             PaymentID INTEGER PRIMARY KEY AUTOINCREMENT,
-            OrderID INTEGER, -- Can be null for general payments to a contractor not tied to an order
+            OrderID INTEGER, -- Can be null for general payments
             ContractorID INTEGER NOT NULL,
             PaymentDate TEXT NOT NULL,
             Amount REAL NOT NULL,
@@ -84,8 +84,17 @@ def init_db():
             FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
             FOREIGN KEY (ContractorID) REFERENCES Contractors(ContractorID)
         );
+        
+        -- NEW: Deductions table to track financial cuts during order completion
+        CREATE TABLE IF NOT EXISTS Deductions (
+            DeductionID INTEGER PRIMARY KEY AUTOINCREMENT,
+            OrderID INTEGER NOT NULL,
+            Amount REAL NOT NULL,
+            Reason TEXT NOT NULL,
+            FOREIGN KEY (OrderID) REFERENCES Orders(OrderID)
+        );
     ''')
-    print("Database schema simplified and initialized.")
+    print("Database schema initialized.")
 
 @click.command('init-db')
 @with_appcontext

@@ -20,15 +20,17 @@ def handle_orders():
         else:
             return jsonify({"error": result.get('error', 'Unknown error')}), 400
     
-    # --- MODIFIED: Get search parameters from query string ---
+    # MODIFIED: Get search and filter parameters from query string
     status = request.args.get('status')
     design_number = request.args.get('design_number')
     shade_card = request.args.get('shade_card')
+    quality = request.args.get('quality')
     
     orders = order_service.get_all_orders(
         status=status,
         design_number=design_number,
-        shade_card=shade_card
+        shade_card=shade_card,
+        quality=quality
     )
     return jsonify(orders)
 
@@ -56,22 +58,8 @@ def handle_get_financials(order_id):
         return jsonify({"error": "Order not found"}), 404
     return jsonify(financials)
 
-@orders_bp.route('/orders/<int:order_id>/payment', methods=['POST'])
-def handle_add_payment(order_id):
-    data = request.get_json()
-    if 'amount' not in data or 'contractor_id' not in data:
-        return jsonify({"error": "Missing 'amount' or 'contractor_id' field"}), 400
-    
-    amount = float(data['amount'])
-    notes = data.get('notes', '')
-    contractor_id = data['contractor_id']
-    
-    result = order_service.add_payment_to_order(order_id, contractor_id, amount, notes)
-
-    if result.get('success'):
-        return jsonify({"message": "Payment added successfully"}), 200
-    else:
-        return jsonify({"error": result.get('error', 'Unknown error')}), 400
+# This endpoint is now handled by the dedicated payments blueprint
+# @orders_bp.route('/orders/<int:order_id>/payment', ...)
 
 @orders_bp.route('/orders/<int:order_id>/complete', methods=['POST'])
 def handle_complete_order(order_id):
@@ -82,5 +70,18 @@ def handle_complete_order(order_id):
     result = order_service.complete_order(order_id, data)
     if result.get('success'):
         return jsonify({"message": "Order completed successfully"}), 200
+    else:
+        return jsonify({"error": result.get('error', 'Unknown error')}), 400
+
+# NEW: Endpoint to handle returning stock after an order is closed
+@orders_bp.route('/orders/<int:order_id>/return-stock', methods=['POST'])
+def handle_return_stock_after_closure(order_id):
+    data = request.get_json()
+    if not all(k in data for k in ['stock_id', 'weight']):
+        return jsonify({"error": "Missing 'stock_id' or 'weight' in request"}), 400
+    
+    result = order_service.return_stock_for_order(order_id, data['stock_id'], data['weight'])
+    if result.get('success'):
+        return jsonify({"message": "Stock returned and payment adjusted successfully"}), 200
     else:
         return jsonify({"error": result.get('error', 'Unknown error')}), 400

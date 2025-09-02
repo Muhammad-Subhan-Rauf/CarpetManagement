@@ -1,5 +1,7 @@
 // Original relative path: src/pages/ClosedDeals.jsx
 
+// src/pages/ClosedDeals.jsx
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getOrders } from '../services/api';
@@ -10,15 +12,16 @@ const ClosedDeals = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     
-    // --- ADDED: State for search inputs ---
+    // ADDED: State for all search/filter inputs
     const [designNumberSearch, setDesignNumberSearch] = useState('');
     const [shadeCardSearch, setShadeCardSearch] = useState('');
+    const [qualitySearch, setQualitySearch] = useState('');
 
-    // --- MODIFIED: useCallback to include search terms ---
+    // MODIFIED: useCallback now depends on all search terms
     const fetchClosedOrders = useCallback(async () => {
         try {
             setLoading(true);
-            const data = await getOrders('closed', designNumberSearch, shadeCardSearch);
+            const data = await getOrders('closed', designNumberSearch, shadeCardSearch, qualitySearch);
             setClosedOrders(data);
             setError(null);
         } catch (err) {
@@ -26,13 +29,12 @@ const ClosedDeals = () => {
         } finally {
             setLoading(false);
         }
-    }, [designNumberSearch, shadeCardSearch]);
+    }, [designNumberSearch, shadeCardSearch, qualitySearch]);
 
     useEffect(() => {
         fetchClosedOrders();
     }, [fetchClosedOrders]);
     
-    // --- ADDED: Handler for the search form ---
     const handleSearch = (e) => {
         e.preventDefault();
         fetchClosedOrders();
@@ -42,9 +44,8 @@ const ClosedDeals = () => {
         <div>
             <h1>Closed Deals (Completed Carpets)</h1>
             
-            {/* --- ADDED: Search Form --- */}
             <Card>
-                <form onSubmit={handleSearch} className="search-form">
+                <form onSubmit={handleSearch} className="search-form-grid">
                     <div className="form-group">
                         <label>Design Number</label>
                         <input
@@ -63,6 +64,15 @@ const ClosedDeals = () => {
                             placeholder="Search by shade..."
                         />
                     </div>
+                    <div className="form-group">
+                        <label>Quality</label>
+                        <input
+                            type="text"
+                            value={qualitySearch}
+                            onChange={(e) => setQualitySearch(e.target.value)}
+                            placeholder="Filter by quality..."
+                        />
+                    </div>
                     <button type="submit" className="button">Search</button>
                 </form>
             </Card>
@@ -77,6 +87,8 @@ const ClosedDeals = () => {
                                 <tr>
                                     <th>Design Number</th>
                                     <th>Shade Card</th>
+                                    <th>Size</th>
+                                    <th>Quality</th>
                                     <th>Contractor</th>
                                     <th>Date Completed</th>
                                     <th>Action</th>
@@ -87,6 +99,8 @@ const ClosedDeals = () => {
                                     <tr key={order.OrderID}>
                                         <td>{order.DesignNumber}</td>
                                         <td>{order.ShadeCard}</td>
+                                        <td>{order.Size || '-'}</td>
+                                        <td>{order.Quality || '-'}</td>
                                         <td>{order.ContractorName}</td>
                                         <td>{order.DateCompleted}</td>
                                         <td>

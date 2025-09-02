@@ -1,5 +1,7 @@
 # Original relative path: app/api/payments.py
 
+# /app/api/payments.py
+
 from flask import Blueprint, jsonify, request
 from app.services.payment_service import add_payment
 
@@ -8,7 +10,8 @@ payments_bp = Blueprint('payments_api', __name__)
 @payments_bp.route('/payments', methods=['POST'])
 def handle_add_payment():
     data = request.get_json()
-    # A general payment only requires the contractor_id and amount.
+    # A general payment requires contractor_id and amount.
+    # A specific payment will also include an order_id.
     if 'amount' not in data or 'contractor_id' not in data:
         return jsonify({"error": "Missing 'amount' or 'contractor_id' field"}), 400
     

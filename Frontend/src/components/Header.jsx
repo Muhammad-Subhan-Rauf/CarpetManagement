@@ -1,5 +1,7 @@
 // Original relative path: src/components/Header.jsx
 
+// Original relative path: src/components/Header.jsx
+
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FaWarehouse, FaClipboardList, FaUsers, FaCheckDouble, FaHourglassHalf } from 'react-icons/fa';

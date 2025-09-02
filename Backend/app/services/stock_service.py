@@ -1,3 +1,5 @@
+# Original relative path: app/services/stock_service.py
+
 # /app/services/stock_service.py
 
 import sqlite3

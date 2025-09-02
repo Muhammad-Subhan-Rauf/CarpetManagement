@@ -5,10 +5,9 @@ from app.database.db import get_db
 from app.services.excel_service import export_all_tables_to_excel
 import datetime
 
-def get_all_orders(status=None, design_number=None, shade_card=None):
+def get_all_orders(status=None, design_number=None, shade_card=None, quality=None):
     """
-    Fetches all orders, with optional filtering by status, design number, and shade card.
-    --- MODIFIED TO INCLUDE SEARCH FUNCTIONALITY ---
+    Fetches all orders, with optional filtering by status, design number, shade card, and quality.
     """
     db = get_db()
     
@@ -32,6 +31,10 @@ def get_all_orders(status=None, design_number=None, shade_card=None):
     if shade_card:
         conditions.append("o.ShadeCard LIKE ?")
         params.append(f"%{shade_card}%")
+
+    if quality:
+        conditions.append("o.Quality LIKE ?")
+        params.append(f"%{quality}%")
 
     if conditions:
         base_query += " WHERE " + " AND ".join(conditions)
@@ -96,36 +99,40 @@ def complete_order(order_id, data):
             (date_completed, order_id)
         )
 
-        # Handle stock reconciliation (returned vs kept)
-        for item in data.get('reconciliation', []):
+        # Handle returned stock
+        for item in data.get('returnedStock', []):
             stock_id = item['StockID']
-            weight_returned = float(item.get('weight_returned', 0.0))
-            weight_kept = float(item.get('weight_kept', 0.0))
+            weight_returned = float(item.get('WeightKg', 0.0))
             
-            issued_trans = db.execute(
-                "SELECT PricePerKgAtTimeOfTransaction FROM StockTransactions WHERE OrderID = ? AND StockID = ? AND TransactionType = 'Issued' LIMIT 1",
-                (order_id, stock_id)
-            ).fetchone()
-            price_at_transaction = issued_trans['PricePerKgAtTimeOfTransaction'] if issued_trans else 0
-
             if weight_returned > 0:
+                issued_trans = db.execute(
+                    "SELECT PricePerKgAtTimeOfTransaction FROM StockTransactions WHERE OrderID = ? AND StockID = ? AND TransactionType = 'Issued' LIMIT 1",
+                    (order_id, stock_id)
+                ).fetchone()
+                price_at_transaction = issued_trans['PricePerKgAtTimeOfTransaction'] if issued_trans else 0
+
                 db.execute("UPDATE StockItems SET QuantityInStockKg = QuantityInStockKg + ? WHERE StockID = ?", (weight_returned, stock_id))
                 db.execute(
                     "INSERT INTO StockTransactions (OrderID, StockID, TransactionType, WeightKg, PricePerKgAtTimeOfTransaction, Notes) VALUES (?, ?, ?, ?, ?, ?)",
-                    (order_id, stock_id, 'Returned', weight_returned, price_at_transaction, "Returned to inventory")
-                )
-            
-            if weight_kept > 0:
-                db.execute(
-                    "INSERT INTO StockTransactions (OrderID, StockID, TransactionType, WeightKg, PricePerKgAtTimeOfTransaction, Notes) VALUES (?, ?, ?, ?, ?, ?)",
-                    (order_id, stock_id, 'Returned', weight_kept, price_at_transaction, "Kept by contractor")
+                    (order_id, stock_id, 'Returned', weight_returned, price_at_transaction, "Returned on completion")
                 )
 
-        # Add a final payment if provided
-        final_payment = float(data.get('final_payment', 0.0))
-        if final_payment > 0:
+        # Handle deductions
+        for deduction in data.get('deductions', []):
+            amount = float(deduction.get('amount', 0.0))
+            reason = deduction.get('reason', 'No reason provided')
+            if amount > 0:
+                db.execute(
+                    "INSERT INTO Deductions (OrderID, Amount, Reason) VALUES (?, ?, ?)",
+                    (order_id, amount, reason)
+                )
+
+        # Add a new payment if provided
+        new_payment = float(data.get('newPaymentAmount', 0.0))
+        if new_payment > 0:
             contractor_id = db.execute("SELECT ContractorID FROM Orders WHERE OrderID = ?", (order_id,)).fetchone()['ContractorID']
-            add_payment_to_order(order_id, contractor_id, final_payment, "Final payment on order completion")
+            from .payment_service import add_payment
+            add_payment({'order_id': order_id, 'contractor_id': contractor_id, 'amount': new_payment, 'notes': 'Payment on order completion'})
 
         db.commit()
         export_all_tables_to_excel()
@@ -134,16 +141,55 @@ def complete_order(order_id, data):
         db.rollback()
         return {"success": False, "error": str(e)}
 
-def add_payment_to_order(order_id, contractor_id, amount, notes):
+def return_stock_for_order(order_id, stock_id, weight_returned):
+    """Handles stock returns after an order is closed, creating a refund payment."""
     db = get_db()
-    payment_date = datetime.date.today().isoformat()
-    db.execute(
-        "INSERT INTO Payments (OrderID, ContractorID, PaymentDate, Amount, Notes) VALUES (?, ?, ?, ?, ?)",
-        (order_id, contractor_id, payment_date, amount, notes)
-    )
-    db.commit()
-    export_all_tables_to_excel()
-    return {"success": True}
+    try:
+        db.execute("BEGIN")
+        
+        weight_returned = float(weight_returned)
+        if weight_returned <= 0:
+            raise ValueError("Return weight must be positive.")
+
+        # Find original transaction to get the price
+        orig_trans = db.execute("""
+            SELECT PricePerKgAtTimeOfTransaction FROM StockTransactions 
+            WHERE OrderID = ? AND StockID = ? AND TransactionType = 'Issued' 
+            LIMIT 1
+        """, (order_id, stock_id)).fetchone()
+
+        if not orig_trans:
+            raise ValueError("This stock was not originally issued for this order.")
+        
+        price_at_transaction = orig_trans['PricePerKgAtTimeOfTransaction']
+        refund_amount = weight_returned * price_at_transaction
+        
+        # 1. Add stock back to inventory
+        db.execute("UPDATE StockItems SET QuantityInStockKg = QuantityInStockKg + ? WHERE StockID = ?", (weight_returned, stock_id))
+
+        # 2. Log the return transaction
+        db.execute(
+            """INSERT INTO StockTransactions (OrderID, StockID, TransactionType, WeightKg, PricePerKgAtTimeOfTransaction, Notes) 
+               VALUES (?, ?, 'Returned', ?, ?, ?)""",
+            (order_id, stock_id, weight_returned, price_at_transaction, 'Post-closure return')
+        )
+        
+        # 3. Create a "negative payment" (refund) to balance the books
+        contractor_id = db.execute("SELECT ContractorID FROM Orders WHERE OrderID = ?", (order_id,)).fetchone()['ContractorID']
+        from .payment_service import add_payment
+        add_payment({
+            'order_id': order_id,
+            'contractor_id': contractor_id,
+            'amount': -refund_amount,
+            'notes': f'Refund for post-closure return of {weight_returned}kg stock'
+        })
+        
+        db.commit()
+        export_all_tables_to_excel()
+        return {"success": True}
+    except (ValueError, db.Error) as e:
+        db.rollback()
+        return {"success": False, "error": str(e)}
 
 def get_order_financials(order_id):
     db = get_db()
@@ -154,7 +200,8 @@ def get_order_financials(order_id):
     SELECT
         (SELECT IFNULL(SUM(Amount), 0) FROM Payments WHERE OrderID = o.OrderID) AS AmountPaid,
         (SELECT IFNULL(SUM(WeightKg * PricePerKgAtTimeOfTransaction), 0) FROM StockTransactions WHERE OrderID = o.OrderID AND TransactionType = 'Issued') AS IssuedValue,
-        (SELECT IFNULL(SUM(WeightKg * PricePerKgAtTimeOfTransaction), 0) FROM StockTransactions WHERE OrderID = o.OrderID AND TransactionType = 'Returned') AS ReturnedValue
+        (SELECT IFNULL(SUM(WeightKg * PricePerKgAtTimeOfTransaction), 0) FROM StockTransactions WHERE OrderID = o.OrderID AND TransactionType = 'Returned') AS ReturnedValue,
+        (SELECT IFNULL(SUM(Amount), 0) FROM Deductions WHERE OrderID = o.OrderID) AS TotalDeductions
     FROM Orders o WHERE o.OrderID = ?;
     """
     result = db.execute(query, (order_id,)).fetchone()
@@ -162,7 +209,6 @@ def get_order_financials(order_id):
     financials = dict(result)
     
     total_fine = 0
-    # Use DateCompleted if available, otherwise check against today for open orders
     end_date = order['DateCompleted'] if order['DateCompleted'] else str(datetime.date.today())
     if order['DateDue'] and order['PenaltyPerDay'] > 0:
         if end_date > order['DateDue']:
@@ -170,9 +216,11 @@ def get_order_financials(order_id):
             total_fine = max(0, days_diff) * order['PenaltyPerDay']
 
     financials['TotalFine'] = round(total_fine, 2)
-    net_value = financials['IssuedValue'] - financials['ReturnedValue']
+    initial_wage_base = financials['IssuedValue']
+    net_value = financials['IssuedValue'] - financials['ReturnedValue'] - financials['TotalDeductions']
     pending_amount = net_value - financials['AmountPaid'] + financials['TotalFine']
     
+    financials['InitialWageBase'] = round(initial_wage_base, 2)
     financials['NetValue'] = round(net_value, 2)
     financials['AmountPending'] = round(pending_amount, 2)
     return financials
@@ -180,7 +228,7 @@ def get_order_financials(order_id):
 def get_transactions_by_order_id(order_id):
     db = get_db()
     transactions = db.execute("""
-        SELECT st.*, si.Type, si.Quality, si.ColorShadeNumber
+        SELECT st.*, si.Type, si.Quality, si.ColorShadeNumber, si.StockID
         FROM StockTransactions st JOIN StockItems si ON st.StockID = si.StockID
         WHERE st.OrderID = ? ORDER BY st.TransactionID
     """, (order_id,)).fetchall()

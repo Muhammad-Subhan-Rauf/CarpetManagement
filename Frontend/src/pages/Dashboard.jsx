@@ -3,12 +3,12 @@
 // src/pages/Dashboard.jsx
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getOrders } from '../services/api'; // Changed from getLentRecords to getOrders
+import { getOrders } from '../services/api';
 import Card from '../components/Card';
 
 const Dashboard = () => {
     const [searchTerm, setSearchTerm] = useState('');
-    const [openOrders, setOpenOrders] = useState([]); // Renamed from allRecords
+    const [openOrders, setOpenOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -16,7 +16,6 @@ const Dashboard = () => {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                // Fetch only 'Open' orders for the dashboard
                 const ordersData = await getOrders('open'); 
                 setOpenOrders(ordersData);
                 setError(null);
@@ -60,12 +59,12 @@ const Dashboard = () => {
                     <Card key={order.OrderID}>
                         <div className="record-summary">
                             <div>
-                                <h3>{order.DesignNumber}</h3>
+                                <h3>{order.DesignNumber} ({order.Size || 'No size'})</h3>
                                 <p><strong>Contractor:</strong> {order.ContractorName}</p>
+                                <p><strong>Quality:</strong> {order.Quality || 'N/A'}</p>
                                 <p><strong>Issued on:</strong> {order.DateIssued}</p>
                                 <p><strong>Notes:</strong> {order.Notes || 'N/A'}</p>
                             </div>
-                            {/* Link points to the unified OrderDetails page */}
                             <Link to={`/order/${order.OrderID}`} className="button">
                                 View Details
                             </Link>

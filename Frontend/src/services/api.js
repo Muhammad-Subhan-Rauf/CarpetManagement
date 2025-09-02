@@ -39,12 +39,13 @@ export const addStockItem = (data) => fetchApi('/stock_items', { method: 'POST',
 export const updateStockItem = (stockId, data) => fetchApi(`/stock_items/${stockId}`, { method: 'PUT', body: JSON.stringify(data) });
 
 // Order APIs
-// --- MODIFIED: Function now accepts search parameters ---
-export const getOrders = (status, designNumber = '', shadeCard = '') => {
+// MODIFIED: Function now accepts search and filter parameters
+export const getOrders = (status, designNumber = '', shadeCard = '', quality = '') => {
   const params = new URLSearchParams({
     status: status || '',
     design_number: designNumber,
     shade_card: shadeCard,
+    quality: quality,
   });
   return fetchApi(`/orders?${params.toString()}`);
 };
@@ -54,7 +55,17 @@ export const completeOrder = (orderId, data) => fetchApi(`/orders/${orderId}/com
 export const getOrderTransactions = (orderId) => fetchApi(`/orders/${orderId}/transactions`);
 export const getOrderFinancials = (orderId) => fetchApi(`/orders/${orderId}/financials`);
 export const getOrderPayments = (orderId) => fetchApi(`/orders/${orderId}/payments`);
-export const addPaymentToOrder = (orderId, contractor_id, amount, notes) => fetchApi(`/orders/${orderId}/payment`, { method: 'POST', body: JSON.stringify({ contractor_id, amount, notes }) });
 
-// General Payment API (not tied to a specific order)
+// NEW: API call for returning stock on a closed order
+export const returnStockForOrder = (orderId, stock_id, weight) => fetchApi(`/orders/${orderId}/return-stock`, {
+    method: 'POST',
+    body: JSON.stringify({ stock_id, weight })
+});
+
+
+// General Payment API (not tied to a specific order/record)
+// Correctly points to the dedicated /payments endpoint now
 export const addGeneralPayment = (data) => fetchApi('/payments', { method: 'POST', body: JSON.stringify(data) });
+
+// Specific Payment API for adding payment to an order
+export const addPaymentToOrder = (data) => fetchApi('/payments', { method: 'POST', body: JSON.stringify(data) });

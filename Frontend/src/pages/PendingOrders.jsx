@@ -1,5 +1,7 @@
 // Original relative path: src/pages/PendingOrders.jsx
 
+// src/pages/PendingOrders.jsx
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getOrders } from '../services/api';
@@ -10,15 +12,15 @@ const PendingOrders = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // State for search inputs
+    // State for all search/filter inputs
     const [designNumberSearch, setDesignNumberSearch] = useState('');
     const [shadeCardSearch, setShadeCardSearch] = useState('');
+    const [qualitySearch, setQualitySearch] = useState('');
 
     const fetchPendingOrders = useCallback(async () => {
         try {
             setLoading(true);
-            // Fetch orders with status 'open' and search terms
-            const data = await getOrders('open', designNumberSearch, shadeCardSearch);
+            const data = await getOrders('open', designNumberSearch, shadeCardSearch, qualitySearch);
             setPendingOrders(data);
             setError(null);
         } catch (err) {
@@ -26,7 +28,7 @@ const PendingOrders = () => {
         } finally {
             setLoading(false);
         }
-    }, [designNumberSearch, shadeCardSearch]);
+    }, [designNumberSearch, shadeCardSearch, qualitySearch]);
 
     useEffect(() => {
         fetchPendingOrders();
@@ -42,7 +44,7 @@ const PendingOrders = () => {
             <h1>Pending Orders</h1>
             
             <Card>
-                <form onSubmit={handleSearch} className="search-form">
+                <form onSubmit={handleSearch} className="search-form-grid">
                     <div className="form-group">
                         <label>Design Number</label>
                         <input
@@ -61,6 +63,15 @@ const PendingOrders = () => {
                             placeholder="Search by shade..."
                         />
                     </div>
+                     <div className="form-group">
+                        <label>Quality</label>
+                        <input
+                            type="text"
+                            value={qualitySearch}
+                            onChange={(e) => setQualitySearch(e.target.value)}
+                            placeholder="Filter by quality..."
+                        />
+                    </div>
                     <button type="submit" className="button">Search</button>
                 </form>
             </Card>
@@ -75,6 +86,8 @@ const PendingOrders = () => {
                                 <tr>
                                     <th>Design Number</th>
                                     <th>Shade Card</th>
+                                    <th>Size</th>
+                                    <th>Quality</th>
                                     <th>Contractor</th>
                                     <th>Date Issued</th>
                                     <th>Date Due</th>
@@ -86,6 +99,8 @@ const PendingOrders = () => {
                                     <tr key={order.OrderID}>
                                         <td>{order.DesignNumber}</td>
                                         <td>{order.ShadeCard}</td>
+                                        <td>{order.Size || '-'}</td>
+                                        <td>{order.Quality || '-'}</td>
                                         <td>{order.ContractorName}</td>
                                         <td>{order.DateIssued}</td>
                                         <td>{order.DateDue}</td>

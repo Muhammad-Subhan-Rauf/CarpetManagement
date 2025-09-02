@@ -1,3 +1,5 @@
+# Original relative path: app/api/stock.py
+
 # /app/api/stock.py
 
 from flask import Blueprint, jsonify, request
