@@ -39,7 +39,15 @@ export const addStockItem = (data) => fetchApi('/stock_items', { method: 'POST',
 export const updateStockItem = (stockId, data) => fetchApi(`/stock_items/${stockId}`, { method: 'PUT', body: JSON.stringify(data) });
 
 // Order APIs
-export const getOrders = (status) => fetchApi(`/orders?status=${status || ''}`);
+// --- MODIFIED: Function now accepts search parameters ---
+export const getOrders = (status, designNumber = '', shadeCard = '') => {
+  const params = new URLSearchParams({
+    status: status || '',
+    design_number: designNumber,
+    shade_card: shadeCard,
+  });
+  return fetchApi(`/orders?${params.toString()}`);
+};
 export const getOrderById = (orderId) => fetchApi(`/orders/${orderId}`);
 export const createOrder = (data) => fetchApi('/orders', { method: 'POST', body: JSON.stringify(data) });
 export const completeOrder = (orderId, data) => fetchApi(`/orders/${orderId}/complete`, { method: 'POST', body: JSON.stringify(data) });
@@ -49,5 +57,4 @@ export const getOrderPayments = (orderId) => fetchApi(`/orders/${orderId}/paymen
 export const addPaymentToOrder = (orderId, contractor_id, amount, notes) => fetchApi(`/orders/${orderId}/payment`, { method: 'POST', body: JSON.stringify({ contractor_id, amount, notes }) });
 
 // General Payment API (not tied to a specific order)
-// --- THIS IS THE FIX ---
 export const addGeneralPayment = (data) => fetchApi('/payments', { method: 'POST', body: JSON.stringify(data) });

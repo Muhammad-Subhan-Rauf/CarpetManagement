@@ -1,25 +1,25 @@
-// Original relative path: src/pages/ClosedDeals.jsx
+// Original relative path: src/pages/PendingOrders.jsx
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getOrders } from '../services/api';
 import Card from '../components/Card';
 
-const ClosedDeals = () => {
-    const [closedOrders, setClosedOrders] = useState([]);
+const PendingOrders = () => {
+    const [pendingOrders, setPendingOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    
-    // --- ADDED: State for search inputs ---
+
+    // State for search inputs
     const [designNumberSearch, setDesignNumberSearch] = useState('');
     const [shadeCardSearch, setShadeCardSearch] = useState('');
 
-    // --- MODIFIED: useCallback to include search terms ---
-    const fetchClosedOrders = useCallback(async () => {
+    const fetchPendingOrders = useCallback(async () => {
         try {
             setLoading(true);
-            const data = await getOrders('closed', designNumberSearch, shadeCardSearch);
-            setClosedOrders(data);
+            // Fetch orders with status 'open' and search terms
+            const data = await getOrders('open', designNumberSearch, shadeCardSearch);
+            setPendingOrders(data);
             setError(null);
         } catch (err) {
             setError(err.message);
@@ -29,20 +29,18 @@ const ClosedDeals = () => {
     }, [designNumberSearch, shadeCardSearch]);
 
     useEffect(() => {
-        fetchClosedOrders();
-    }, [fetchClosedOrders]);
-    
-    // --- ADDED: Handler for the search form ---
+        fetchPendingOrders();
+    }, [fetchPendingOrders]);
+
     const handleSearch = (e) => {
         e.preventDefault();
-        fetchClosedOrders();
+        fetchPendingOrders();
     };
 
     return (
         <div>
-            <h1>Closed Deals (Completed Carpets)</h1>
+            <h1>Pending Orders</h1>
             
-            {/* --- ADDED: Search Form --- */}
             <Card>
                 <form onSubmit={handleSearch} className="search-form">
                     <div className="form-group">
@@ -68,27 +66,29 @@ const ClosedDeals = () => {
             </Card>
 
             <Card>
-                {loading && <div>Loading closed deals...</div>}
+                {loading && <div>Loading pending orders...</div>}
                 {error && <div style={{ color: 'red' }}>Error: {error}</div>}
                 {!loading && !error && (
-                    closedOrders.length > 0 ? (
+                    pendingOrders.length > 0 ? (
                         <table className="styled-table">
                             <thead>
                                 <tr>
                                     <th>Design Number</th>
                                     <th>Shade Card</th>
                                     <th>Contractor</th>
-                                    <th>Date Completed</th>
+                                    <th>Date Issued</th>
+                                    <th>Date Due</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {closedOrders.map(order => (
+                                {pendingOrders.map(order => (
                                     <tr key={order.OrderID}>
                                         <td>{order.DesignNumber}</td>
                                         <td>{order.ShadeCard}</td>
                                         <td>{order.ContractorName}</td>
-                                        <td>{order.DateCompleted}</td>
+                                        <td>{order.DateIssued}</td>
+                                        <td>{order.DateDue}</td>
                                         <td>
                                             <Link to={`/order/${order.OrderID}`} className="button-small">
                                                 View Details
@@ -99,7 +99,7 @@ const ClosedDeals = () => {
                             </tbody>
                         </table>
                     ) : (
-                        <p>No completed orders found for the current search criteria.</p>
+                        <p>No pending orders found for the current search criteria.</p>
                     )
                 )}
             </Card>
@@ -107,4 +107,4 @@ const ClosedDeals = () => {
     );
 };
 
-export default ClosedDeals;
+export default PendingOrders;

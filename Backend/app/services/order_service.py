@@ -5,21 +5,40 @@ from app.database.db import get_db
 from app.services.excel_service import export_all_tables_to_excel
 import datetime
 
-def get_all_orders(status=None):
+def get_all_orders(status=None, design_number=None, shade_card=None):
+    """
+    Fetches all orders, with optional filtering by status, design number, and shade card.
+    --- MODIFIED TO INCLUDE SEARCH FUNCTIONALITY ---
+    """
     db = get_db()
+    
     base_query = """
         SELECT o.*, c.Name as ContractorName
         FROM Orders o
         JOIN Contractors c ON o.ContractorID = c.ContractorID
     """
+    
+    conditions = []
     params = []
+
     if status:
-        base_query += " WHERE o.Status = ?"
+        conditions.append("o.Status = ?")
         params.append(status.capitalize())
+    
+    if design_number:
+        conditions.append("o.DesignNumber LIKE ?")
+        params.append(f"%{design_number}%")
+        
+    if shade_card:
+        conditions.append("o.ShadeCard LIKE ?")
+        params.append(f"%{shade_card}%")
+
+    if conditions:
+        base_query += " WHERE " + " AND ".join(conditions)
         
     base_query += " ORDER BY o.DateIssued DESC"
     
-    orders = db.execute(base_query, params).fetchall()
+    orders = db.execute(base_query, tuple(params)).fetchall()
     return [dict(row) for row in orders]
 
 def get_order_by_id(order_id):

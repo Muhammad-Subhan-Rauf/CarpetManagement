@@ -20,8 +20,16 @@ def handle_orders():
         else:
             return jsonify({"error": result.get('error', 'Unknown error')}), 400
     
-    status = request.args.get('status') # e.g., 'Open' or 'Closed'
-    orders = order_service.get_all_orders(status=status)
+    # --- MODIFIED: Get search parameters from query string ---
+    status = request.args.get('status')
+    design_number = request.args.get('design_number')
+    shade_card = request.args.get('shade_card')
+    
+    orders = order_service.get_all_orders(
+        status=status,
+        design_number=design_number,
+        shade_card=shade_card
+    )
     return jsonify(orders)
 
 @orders_bp.route('/orders/<int:order_id>', methods=['GET'])

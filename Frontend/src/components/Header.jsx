@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FaWarehouse, FaClipboardList, FaUsers, FaCheckDouble } from 'react-icons/fa';
+import { FaWarehouse, FaClipboardList, FaUsers, FaCheckDouble, FaHourglassHalf } from 'react-icons/fa';
 
 const Header = () => {
   return (
@@ -14,6 +14,11 @@ const Header = () => {
         <Link to="/" className="nav-link">
           <FaClipboardList />
           <span>Dashboard</span>
+        </Link>
+        {/* --- ADDED "Pending Orders" LINK --- */}
+        <Link to="/pending-orders" className="nav-link">
+          <FaHourglassHalf />
+          <span>Pending Orders</span>
         </Link>
          <Link to="/contractors" className="nav-link">
           <FaUsers />

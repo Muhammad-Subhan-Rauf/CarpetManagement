@@ -12,6 +12,8 @@ import ContractorDetails from './pages/ContractorDetails';
 import NewOrder from './pages/NewOrder';
 import OrderDetails from './pages/OrderDetails';
 import ClosedDeals from './pages/ClosedDeals';
+// --- Make sure this import is present ---
+import PendingOrders from './pages/PendingOrders';
 
 function App() {
   return (
@@ -24,6 +26,10 @@ function App() {
           <Route path="/contractor/:contractorId" element={<ContractorDetails />} />
           <Route path="/new-order" element={<NewOrder />} />
           <Route path="/order/:orderId" element={<OrderDetails />} />
+          
+          {/* --- Ensure this route definition exists --- */}
+          <Route path="/pending-orders" element={<PendingOrders />} />
+          
           <Route path="/closed-deals" element={<ClosedDeals />} />
         </Routes>
       </Layout>
