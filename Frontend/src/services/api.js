@@ -1,9 +1,25 @@
+// Original relative path: src/services/api.js
+
 // src/services/api.js
 
-const API_BASE_URL = 'http://127.0.0.1:55000/api';
+const API_HOST = 'http://127.0.0.1';
+const DEFAULT_PORT = '55000';
+
+export const getApiPort = () => {
+  return localStorage.getItem('api_port') || DEFAULT_PORT;
+};
+
+export const setApiPort = (port) => {
+  if (port && !isNaN(port) && Number(port) > 0) {
+    localStorage.setItem('api_port', port);
+  } else {
+    localStorage.removeItem('api_port');
+  }
+};
 
 async function fetchApi(endpoint, options = {}) {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const port = getApiPort();
+  const url = `${API_HOST}:${port}/api${endpoint}`;
   
   const config = {
     headers: { 'Content-Type': 'application/json' },
