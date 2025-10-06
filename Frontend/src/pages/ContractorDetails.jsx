@@ -1,7 +1,3 @@
-// Original relative path: src/pages/ContractorDetails.jsx
-
-// src/pages/ContractorDetails.jsx
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getContractorDetails, addGeneralPayment } from '../services/api';
@@ -16,7 +12,7 @@ const ContractorDetails = () => {
     const [activeTab, setActiveTab] = useState('summary');
     
     // State for filtering
-    const [qualityFilter, setQualityFilter] = useState('');
+    const [qualityFilter, setQualityFilter] = useState('all');
     
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [paymentAmount, setPaymentAmount] = useState('');
@@ -33,6 +29,39 @@ const ContractorDetails = () => {
     }, [contractorId]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
+
+    const uniqueQualities = useMemo(() => {
+        if (!details?.summary_by_carpet_quality) return [];
+        // Extract the 'quality' key from each object in the array
+        const qualities = details.summary_by_carpet_quality.map(s => s.quality);
+        return [...new Set(qualities)];
+    }, [details]);
+
+    // NEW, SIMPLIFIED LOGIC
+    const displayedSummary = useMemo(() => {
+        if (!details) return {};
+        
+        // If 'all' is selected, return the pre-calculated overall summary
+        if (qualityFilter === 'all') {
+            return {
+                ...details.overall_summary,
+                // Add fields to match the structure for consistent display
+                total_wages: details.overall_summary.total_order_wages,
+                deductions: details.overall_summary.total_deductions,
+                payments: details.overall_summary.total_paid,
+                balance_owed: details.overall_summary.final_balance_owed,
+                net_stock_value: details.overall_summary.net_stock_value
+            };
+        }
+        
+        // Find the specific quality summary from the backend's calculation
+        const qualityData = details.summary_by_carpet_quality.find(s => s.quality === qualityFilter);
+        
+        // Return it, or a zeroed-out object if not found
+        return qualityData || { total_wages: 0, net_stock_value: 0, deductions: 0, payments: 0, balance_owed: 0 };
+
+    }, [qualityFilter, details]);
+
 
     const handleMakePayment = async (e) => {
         e.preventDefault();
@@ -51,31 +80,12 @@ const ContractorDetails = () => {
             fetchData(); // Refresh data
         } catch(err) { alert(`Error making payment: ${err.message}`); }
     };
-
-    // Memoized filtering logic
-    const filteredData = useMemo(() => {
-        if (!details) return null;
-        if (!qualityFilter) return details;
-
-        const filteredOrders = details.orders.filter(o => o.Quality && o.Quality.toLowerCase().includes(qualityFilter.toLowerCase()));
-        const filteredOrderIds = new Set(filteredOrders.map(o => o.OrderID));
-        
-        const filteredTransactions = details.transactions.filter(t => filteredOrderIds.has(t.OrderID));
-        const filteredPayments = details.payments.filter(p => !p.OrderID || filteredOrderIds.has(p.OrderID)); // Keep general payments
-
-        return {
-            ...details,
-            orders: filteredOrders,
-            transactions: filteredTransactions,
-            payments: filteredPayments,
-        };
-    }, [details, qualityFilter]);
     
     if (loading) return <div>Loading contractor details...</div>;
     if (error) return <div style={{ color: 'red' }}>Error: {error}</div>;
-    if (!filteredData) return <h2>Contractor not found.</h2>;
+    if (!details) return <h2>Contractor not found.</h2>;
 
-    const { contractor, financial_summary, orders, transactions, payments, currently_held_stock } = filteredData;
+    const { contractor, orders, transactions, payments, currently_held_stock } = details;
 
     return (
         <div>
@@ -84,14 +94,26 @@ const ContractorDetails = () => {
             <p>{contractor.ContactInfo}</p>
             
             <div className="details-grid-3-col">
-                <Card title="Overall Financial Summary">
-                    <div className="financial-item"><span>Total Value of Stock Issued:</span> <span>Rs {financial_summary.total_value_issued.toFixed(2)}</span></div>
-                    <div className="financial-item negative"><span>(-) Total Value of Stock Returned:</span> <span>Rs {financial_summary.total_value_returned.toFixed(2)}</span></div>
+                <Card title="Financial Summary">
+                     <div className="form-group" style={{ marginBottom: '1rem' }}>
+                        <label>Filter by Carpet Quality</label>
+                        <select value={qualityFilter} onChange={e => setQualityFilter(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: '4px' }}>
+                            <option value="all">Overall Summary</option>
+                            {uniqueQualities.map(q => <option key={q} value={q}>{q}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="financial-item"><span>Total Wages from Orders:</span> <span>Rs {displayedSummary.total_wages?.toFixed(2) || '0.00'}</span></div>
+                    <div className="financial-item negative"><span>(-) Net Value of Stock Used:</span> <span>Rs {displayedSummary.net_stock_value?.toFixed(2) || '0.00'}</span></div>
+                    <div className="financial-item negative"><span>(-) Total Deductions:</span> <span>Rs {displayedSummary.deductions?.toFixed(2) || '0.00'}</span></div>
                     <hr/>
-                    <div className="financial-item total"><span>Net Work Value:</span> <span>Rs {financial_summary.net_work_value.toFixed(2)}</span></div>
+                    <div className="financial-item total">
+                        <span>Net Payable Amount:</span> 
+                        <span>Rs {( (displayedSummary.total_wages || 0) - (displayedSummary.net_stock_value || 0) - (displayedSummary.deductions || 0) ).toFixed(2)}</span>
+                    </div>
                     <hr/>
-                    <div className="financial-item"><span>Total Paid to Contractor:</span> <span>Rs {financial_summary.total_paid.toFixed(2)}</span></div>
-                    <div className="financial-item pending"><span>Final Balance (Owed by you):</span> <span>Rs {financial_summary.final_balance_owed.toFixed(2)}</span></div>
+                    <div className="financial-item"><span>Total Paid:</span> <span>Rs {displayedSummary.payments?.toFixed(2) || '0.00'}</span></div>
+                    <div className="financial-item pending"><span>Final Balance:</span> <span>Rs {displayedSummary.balance_owed?.toFixed(2) || '0.00'}</span></div>
                     <div style={{marginTop: '1.5rem'}}><button className="button" onClick={() => setIsPaymentModalOpen(true)}>Make a General Payment</button></div>
                 </Card>
 
@@ -104,36 +126,28 @@ const ContractorDetails = () => {
                     ) : <p>No stock currently held.</p>}
                 </Card>
                 
-                 <Card title="Order History">
-                    {orders.length > 0 ? (
+                 <Card title="Summary by Carpet Quality">
+                    {details.summary_by_carpet_quality.length > 0 ? (
                         <table className="styled-table-small">
-                            <thead><tr><th>Design # / Size</th><th>Quality</th><th>Status</th><th>Action</th></tr></thead>
-                            <tbody>{orders.map(o => (<tr key={o.OrderID}>
-                                <td><strong>{o.DesignNumber}</strong><br/><small>{o.Size} / {o.ShadeCard}</small></td>
-                                <td>{o.Quality}</td>
-                                <td><span className={`status-badge status-${o.Status}`}>{o.Status}</span></td>
-                                <td><Link to={`/order/${o.OrderID}`} className="button-small">View</Link></td>
+                            <thead><tr><th>Quality</th><th>Balance</th></tr></thead>
+                            <tbody>{details.summary_by_carpet_quality.map(s => (<tr key={s.quality}>
+                                <td>{s.quality}</td>
+                                <td>Rs {s.balance_owed.toFixed(2)}</td>
                             </tr>))}</tbody>
                         </table>
-                    ) : <p>No orders found for this filter.</p>}
+                    ) : <p>No orders with quality found.</p>}
                 </Card>
             </div>
             
             <Card title="Complete Transaction History">
-                 <div className="filter-bar">
-                    <div className="form-group">
-                        <label>Filter by Quality</label>
-                        <input type="text" value={qualityFilter} onChange={(e) => setQualityFilter(e.target.value)} placeholder="e.g., 60x60" />
-                    </div>
+                 <div className="tabs">
+                    <button className={`tab ${activeTab === 'orders' ? 'active' : ''}`} onClick={() => setActiveTab('orders')}>Order History</button>
+                    <button className={`tab ${activeTab === 'payments' ? 'active' : ''}`} onClick={() => setActiveTab('payments')}>Payment History</button>
+                    <button className={`tab ${activeTab === 'transactions' ? 'active' : ''}`} onClick={() => setActiveTab('transactions')}>Stock Ledger</button>
                 </div>
-                <div className="tabs">
-                    <button className={`tab ${activeTab === 'summary' ? 'active' : ''}`} onClick={() => setActiveTab('summary')}>Payment History</button>
-                    <button className={`tab ${activeTab === 'issued' ? 'active' : ''}`} onClick={() => setActiveTab('issued')}>Stock Issued</button>
-                    <button className={`tab ${activeTab === 'returned' ? 'active' : ''}`} onClick={() => setActiveTab('returned')}>Stock Returned</button>
-                </div>
-                {activeTab === 'summary' && ( <table className="styled-table"><thead><tr><th>Date</th><th>Amount (Rs)</th><th>Notes</th><th>Order ID</th></tr></thead><tbody>{payments.map(p => <tr key={p.PaymentID}><td>{p.PaymentDate}</td><td>{p.Amount.toFixed(2)}</td><td>{p.Notes || '-'}</td><td>{p.OrderID || 'General'}</td></tr>)}</tbody></table>)}
-                {activeTab === 'issued' && (<table className="styled-table"><thead><tr><th>Order ID</th><th>Description</th><th>Weight (kg)</th><th>Value</th></tr></thead><tbody>{transactions.filter(t=>t.TransactionType === 'Issued').map(t => <tr key={t.TransactionID}><td>{t.OrderID}</td><td>{t.Type} ({t.Quality})</td><td>{t.WeightKg.toFixed(3)}</td><td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td></tr>)}</tbody></table>)}
-                {activeTab === 'returned' && (<table className="styled-table"><thead><tr><th>Order ID</th><th>Description</th><th>Weight (kg)</th><th>Value</th><th>Notes</th></tr></thead><tbody>{transactions.filter(t=>t.TransactionType === 'Returned').map(t => <tr key={t.TransactionID}><td>{t.OrderID}</td><td>{t.Type} ({t.Quality})</td><td>{t.WeightKg.toFixed(3)}</td><td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td><td>{t.Notes}</td></tr>)}</tbody></table>)}
+                {activeTab === 'orders' && (<table className="styled-table"><thead><tr><th>Design #</th><th>Quality</th><th>Wage</th><th>Status</th><th>Action</th></tr></thead><tbody>{orders.map(o => (<tr key={o.OrderID}><td>{o.DesignNumber}</td><td>{o.Quality}</td><td>Rs {o.Wage?.toFixed(2) || '0.00'}</td><td><span className={`status-badge status-${o.Status}`}>{o.Status}</span></td><td><Link to={`/order/${o.OrderID}`} className="button-small">View</Link></td></tr>))}</tbody></table>)}
+                {activeTab === 'payments' && ( <table className="styled-table"><thead><tr><th>Date</th><th>Amount (Rs)</th><th>Notes</th><th>Order ID</th></tr></thead><tbody>{payments.map(p => <tr key={p.PaymentID}><td>{p.PaymentDate}</td><td>{p.Amount.toFixed(2)}</td><td>{p.Notes || '-'}</td><td>{p.OrderID || 'General'}</td></tr>)}</tbody></table>)}
+                {activeTab === 'transactions' && (<table className="styled-table"><thead><tr><th>Order ID</th><th>Type</th><th>Description</th><th>Weight</th><th>Value</th><th>Notes</th></tr></thead><tbody>{transactions.map(t => <tr key={t.TransactionID}><td>{t.OrderID}</td><td><span className={`status-badge status-${t.TransactionType}`}>{t.TransactionType}</span></td><td>{t.Type} ({t.StockQuality})</td><td>{t.WeightKg.toFixed(3)}</td><td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td><td>{t.Notes || '-'}</td></tr>)}</tbody></table>)}
             </Card>
 
             <Modal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} title={`Pay ${contractor.Name}`}>

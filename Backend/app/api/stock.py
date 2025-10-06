@@ -1,5 +1,3 @@
-# Original relative path: app/api/stock.py
-
 # /app/api/stock.py
 
 from flask import Blueprint, jsonify, request
@@ -20,7 +18,9 @@ def handle_stock_items():
             return jsonify(result), 409 # 409 Conflict
         return jsonify({"message": "Stock item added", "id": result['id']}), 201
     
-    items = stock_service.get_all_stock_items()
+    # MODIFIED: Accept a 'quality' filter
+    quality_filter = request.args.get('quality')
+    items = stock_service.get_all_stock_items(quality=quality_filter)
     return jsonify(items)
 
 @stock_bp.route('/stock_items/<int:stock_id>', methods=['PUT'])

@@ -1,5 +1,3 @@
-# Original relative path: app/database/db.py
-
 # /app/database/db.py
 
 import sqlite3
@@ -53,10 +51,17 @@ def init_db():
             Size TEXT, -- Carpet Size e.g., "8x10 ft"
             DateIssued TEXT NOT NULL,
             DateDue TEXT,
-            DateCompleted TEXT, -- This is set when the order is closed
+            DateCompleted TEXT,
             PenaltyPerDay REAL NOT NULL DEFAULT 0,
             Notes TEXT,
             Status TEXT NOT NULL DEFAULT 'Open', -- 'Open' or 'Closed'
+            
+            -- NEW: Fields for area-based wage calculation
+            Length REAL,
+            Width REAL,
+            PricePerSqFt REAL,
+            Wage REAL, -- This will store the final, possibly overridden, wage.
+
             FOREIGN KEY (ContractorID) REFERENCES Contractors(ContractorID)
         );
 
@@ -68,6 +73,7 @@ def init_db():
             TransactionType TEXT NOT NULL CHECK(TransactionType IN ('Issued', 'Returned')),
             WeightKg REAL NOT NULL, 
             PricePerKgAtTimeOfTransaction REAL NOT NULL,
+            TransactionDate TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             Notes TEXT,
             FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
             FOREIGN KEY (StockID) REFERENCES StockItems(StockID)
@@ -85,13 +91,26 @@ def init_db():
             FOREIGN KEY (ContractorID) REFERENCES Contractors(ContractorID)
         );
         
-        -- NEW: Deductions table to track financial cuts during order completion
+        -- Deductions table to track financial cuts during order completion
         CREATE TABLE IF NOT EXISTS Deductions (
             DeductionID INTEGER PRIMARY KEY AUTOINCREMENT,
             OrderID INTEGER NOT NULL,
             Amount REAL NOT NULL,
             Reason TEXT NOT NULL,
             FOREIGN KEY (OrderID) REFERENCES Orders(OrderID)
+        );
+
+        -- NEW: Table to log contractor reassignments
+        CREATE TABLE IF NOT EXISTS OrderReassignmentLog (
+            LogID INTEGER PRIMARY KEY AUTOINCREMENT,
+            OrderID INTEGER NOT NULL,
+            OldContractorID INTEGER NOT NULL,
+            NewContractorID INTEGER NOT NULL,
+            ReassignmentDate TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            Reason TEXT,
+            FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
+            FOREIGN KEY (OldContractorID) REFERENCES Contractors(ContractorID),
+            FOREIGN KEY (NewContractorID) REFERENCES Contractors(ContractorID)
         );
     ''')
     print("Database schema initialized.")

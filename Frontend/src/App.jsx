@@ -1,5 +1,3 @@
-// Original relative path: src/App.jsx
-
 // src/App.jsx
 
 import React from 'react';

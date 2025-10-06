@@ -1,5 +1,3 @@
-# Original relative path: app/api/orders.py
-
 # /app/api/orders.py
 from flask import Blueprint, jsonify, request
 from app.services import order_service
@@ -83,5 +81,23 @@ def handle_return_stock_after_closure(order_id):
     result = order_service.return_stock_for_order(order_id, data['stock_id'], data['weight'])
     if result.get('success'):
         return jsonify({"message": "Stock returned and payment adjusted successfully"}), 200
+    else:
+        return jsonify({"error": result.get('error', 'Unknown error')}), 400
+
+# NEW: Endpoint to reassign a contractor mid-order
+@orders_bp.route('/orders/<int:order_id>/reassign', methods=['POST'])
+def handle_reassign_order(order_id):
+    data = request.get_json()
+    if not all(k in data for k in ['new_contractor_id', 'reason']):
+        return jsonify({"error": "Missing 'new_contractor_id' or 'reason'"}), 400
+    
+    result = order_service.reassign_order(
+        order_id,
+        data['new_contractor_id'],
+        data['reason']
+    )
+    
+    if result.get('success'):
+        return jsonify({"message": "Order reassigned successfully"}), 200
     else:
         return jsonify({"error": result.get('error', 'Unknown error')}), 400

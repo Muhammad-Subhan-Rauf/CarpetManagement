@@ -1,5 +1,7 @@
 # Original relative path: app/__init__.py
 
+# Original relative path: app/__init__.py
+
 # /app/__init__.py
 
 from flask import Flask
@@ -27,3 +29,12 @@ def create_app(test_config=None):
     app.register_blueprint(payments_bp, url_prefix='/api')
 
     return app
+
+
+
+
+
+
+
+
+

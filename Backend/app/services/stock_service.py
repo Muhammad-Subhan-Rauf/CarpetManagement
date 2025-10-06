@@ -1,14 +1,19 @@
-# Original relative path: app/services/stock_service.py
-
-# /app/services/stock_service.py
-
 import sqlite3
 from app.database.db import get_db
 from app.services.excel_service import export_all_tables_to_excel
 
-def get_all_stock_items():
+def get_all_stock_items(quality=None):
     db = get_db()
-    items = db.execute("SELECT * FROM StockItems ORDER BY Type, Quality").fetchall()
+    query = "SELECT * FROM StockItems"
+    params = []
+    
+    if quality:
+        query += " WHERE Quality = ? OR Type IN ('Tani', 'Butka')"
+        params.append(quality)
+        
+    query += " ORDER BY Type, Quality"
+    
+    items = db.execute(query, tuple(params)).fetchall()
     return [dict(row) for row in items]
 
 def add_stock_item(data):

@@ -1,5 +1,3 @@
-// Original relative path: src/services/api.js
-
 // src/services/api.js
 
 const API_BASE_URL = 'http://127.0.0.1:55000/api';
@@ -34,12 +32,14 @@ export const addContractor = (data) => fetchApi('/contractors', { method: 'POST'
 export const getContractorDetails = (contractorId) => fetchApi(`/contractors/${contractorId}`);
 
 // Stock APIs
-export const getStockItems = () => fetchApi('/stock_items');
+export const getStockItems = (quality = '') => {
+    const params = new URLSearchParams({ quality });
+    return fetchApi(`/stock_items?${params.toString()}`);
+};
 export const addStockItem = (data) => fetchApi('/stock_items', { method: 'POST', body: JSON.stringify(data) });
 export const updateStockItem = (stockId, data) => fetchApi(`/stock_items/${stockId}`, { method: 'PUT', body: JSON.stringify(data) });
 
 // Order APIs
-// MODIFIED: Function now accepts search and filter parameters
 export const getOrders = (status, designNumber = '', shadeCard = '', quality = '') => {
   const params = new URLSearchParams({
     status: status || '',
@@ -55,17 +55,17 @@ export const completeOrder = (orderId, data) => fetchApi(`/orders/${orderId}/com
 export const getOrderTransactions = (orderId) => fetchApi(`/orders/${orderId}/transactions`);
 export const getOrderFinancials = (orderId) => fetchApi(`/orders/${orderId}/financials`);
 export const getOrderPayments = (orderId) => fetchApi(`/orders/${orderId}/payments`);
-
-// NEW: API call for returning stock on a closed order
 export const returnStockForOrder = (orderId, stock_id, weight) => fetchApi(`/orders/${orderId}/return-stock`, {
     method: 'POST',
     body: JSON.stringify({ stock_id, weight })
 });
+// NEW: API call for reassigning an order
+export const reassignOrder = (orderId, data) => fetchApi(`/orders/${orderId}/reassign`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+});
 
 
-// General Payment API (not tied to a specific order/record)
-// Correctly points to the dedicated /payments endpoint now
+// General & Specific Payment API
 export const addGeneralPayment = (data) => fetchApi('/payments', { method: 'POST', body: JSON.stringify(data) });
-
-// Specific Payment API for adding payment to an order
 export const addPaymentToOrder = (data) => fetchApi('/payments', { method: 'POST', body: JSON.stringify(data) });
