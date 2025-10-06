@@ -60,7 +60,7 @@ jobs:
       - name: Build macOS Binary
         working-directory: Backend
         run: |
-          pyinstaller --onefile main.py
+          pyinstaller --onefile run.py
 
       - name: Upload macOS Binary
         uses: actions/upload-artifact@v4
