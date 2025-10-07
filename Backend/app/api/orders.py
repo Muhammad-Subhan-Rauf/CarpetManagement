@@ -109,7 +109,12 @@ def handle_issue_stock_to_order(order_id):
     if not all(k in data for k in ['stock_id', 'weight']):
         return jsonify({"error": "Missing 'stock_id' or 'weight'"}), 400
     
-    result = order_service.issue_stock_to_order(order_id, data['stock_id'], data['weight'])
+    # ADDED: Handle optional transaction date
+    transaction_date = data.get('transaction_date')
+    
+    result = order_service.issue_stock_to_order(
+        order_id, data['stock_id'], data['weight'], transaction_date
+    )
     
     if result.get('success'):
         return jsonify({"message": "Stock issued successfully"}), 200

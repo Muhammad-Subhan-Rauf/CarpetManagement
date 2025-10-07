@@ -96,6 +96,8 @@ def create_order(data):
         for trans in data.get('transactions', []):
             stock_id = trans['StockID']
             weight_kg = float(trans['WeightKg'])
+            # ADDED: Get optional transaction date from payload
+            transaction_date = trans.get('transaction_date')
             
             stock_item = db.execute("SELECT * FROM StockItems WHERE StockID = ?", (stock_id,)).fetchone()
             if not stock_item: raise ValueError(f"Stock item ID {stock_id} not found")
@@ -104,10 +106,18 @@ def create_order(data):
             if new_quantity < 0: raise ValueError(f"Not enough stock for item ID {stock_id}")
             
             db.execute("UPDATE StockItems SET QuantityInStockKg = ? WHERE StockID = ?", (new_quantity, stock_id))
-            db.execute(
-                "INSERT INTO StockTransactions (OrderID, StockID, TransactionType, WeightKg, PricePerKgAtTimeOfTransaction) VALUES (?, ?, ?, ?, ?)",
-                (order_id, stock_id, 'Issued', weight_kg, stock_item['CurrentPricePerKg'])
-            )
+            
+            # MODIFIED: Handle custom transaction date
+            if transaction_date:
+                db.execute(
+                    "INSERT INTO StockTransactions (OrderID, StockID, TransactionType, WeightKg, PricePerKgAtTimeOfTransaction, TransactionDate) VALUES (?, ?, 'Issued', ?, ?, ?)",
+                    (order_id, stock_id, weight_kg, stock_item['CurrentPricePerKg'], transaction_date)
+                )
+            else:
+                db.execute(
+                    "INSERT INTO StockTransactions (OrderID, StockID, TransactionType, WeightKg, PricePerKgAtTimeOfTransaction) VALUES (?, ?, 'Issued', ?, ?)",
+                    (order_id, stock_id, weight_kg, stock_item['CurrentPricePerKg'])
+                )
         
         db.commit()
         export_all_tables_to_excel()
@@ -339,9 +349,10 @@ def reassign_order(order_id, new_contractor_id, reason):
         db.rollback()
         return {"success": False, "error": str(e)}
 
-def issue_stock_to_order(order_id, stock_id, weight_kg):
+def issue_stock_to_order(order_id, stock_id, weight_kg, transaction_date=None):
     """
     Adds a new 'Issued' transaction to an existing, open order.
+    MODIFIED to accept an optional transaction_date.
     """
     db = get_db()
     try:
@@ -365,11 +376,97 @@ def issue_stock_to_order(order_id, stock_id, weight_kg):
         # 3. Update inventory
         db.execute("UPDATE StockItems SET QuantityInStockKg = QuantityInStockKg - ? WHERE StockID = ?", (weight_kg, stock_id))
 
-        # 4. Create the new transaction
+        # 4. Create the new transaction, handling the optional date
+        if transaction_date:
+            db.execute(
+                "INSERT INTO StockTransactions (OrderID, StockID, TransactionType, WeightKg, PricePerKgAtTimeOfTransaction, Notes, TransactionDate) VALUES (?, ?, 'Issued', ?, ?, ?, ?)",
+                (order_id, stock_id, weight_kg, stock_item['CurrentPricePerKg'], 'Additional stock issued', transaction_date)
+            )
+        else:
+            db.execute(
+                "INSERT INTO StockTransactions (OrderID, StockID, TransactionType, WeightKg, PricePerKgAtTimeOfTransaction, Notes) VALUES (?, ?, 'Issued', ?, ?, ?)",
+                (order_id, stock_id, weight_kg, stock_item['CurrentPricePerKg'], 'Additional stock issued')
+            )
+
+        db.commit()
+        return {"success": True}
+    except (ValueError, db.Error) as e:
+        db.rollback()
+        return {"success": False, "error": str(e)}
+
+# --- ADDED: Service functions for stock transaction CRUD ---
+
+def update_stock_transaction(transaction_id, data):
+    """Updates the weight and date of a stock transaction and adjusts inventory accordingly."""
+    db = get_db()
+    try:
+        db.execute("BEGIN")
+        
+        # 1. Get the original transaction
+        original_trans = db.execute("SELECT * FROM StockTransactions WHERE TransactionID = ?", (transaction_id,)).fetchone()
+        if not original_trans:
+            raise ValueError("Transaction not found.")
+            
+        # 2. Check if the parent order is closed
+        order_status = db.execute("SELECT Status FROM Orders WHERE OrderID = ?", (original_trans['OrderID'],)).fetchone()
+        if order_status and order_status['Status'] == 'Closed':
+            raise ValueError("Cannot modify transactions of a closed order.")
+
+        # 3. Calculate the difference in weight
+        original_weight = original_trans['WeightKg']
+        new_weight = float(data['weight'])
+        weight_diff = new_weight - original_weight
+        
+        # 4. Adjust inventory based on transaction type
+        if original_trans['TransactionType'] == 'Issued':
+            # If new weight is more, decrease stock. If less, increase stock.
+            db.execute("UPDATE StockItems SET QuantityInStockKg = QuantityInStockKg - ? WHERE StockID = ?", (weight_diff, original_trans['StockID']))
+        else: # 'Returned'
+            # If new weight is more, increase stock. If less, decrease stock.
+            db.execute("UPDATE StockItems SET QuantityInStockKg = QuantityInStockKg + ? WHERE StockID = ?", (weight_diff, original_trans['StockID']))
+            
+        # 5. Update the transaction itself
         db.execute(
-            "INSERT INTO StockTransactions (OrderID, StockID, TransactionType, WeightKg, PricePerKgAtTimeOfTransaction, Notes) VALUES (?, ?, 'Issued', ?, ?, ?)",
-            (order_id, stock_id, weight_kg, stock_item['CurrentPricePerKg'], 'Additional stock issued')
+            "UPDATE StockTransactions SET WeightKg = ?, TransactionDate = ? WHERE TransactionID = ?",
+            (new_weight, data['date'], transaction_id)
         )
+        
+        db.commit()
+        return {"success": True}
+    except (ValueError, db.Error) as e:
+        db.rollback()
+        return {"success": False, "error": str(e)}
+
+def delete_stock_transaction(transaction_id):
+    """Deletes a stock transaction and reverses its effect on inventory."""
+    db = get_db()
+    try:
+        db.execute("BEGIN")
+
+        # 1. Get the transaction to be deleted
+        trans_to_delete = db.execute("SELECT * FROM StockTransactions WHERE TransactionID = ?", (transaction_id,)).fetchone()
+        if not trans_to_delete:
+            raise ValueError("Transaction not found.")
+
+        # 2. Check if the parent order is closed
+        order_status = db.execute("SELECT Status FROM Orders WHERE OrderID = ?", (trans_to_delete['OrderID'],)).fetchone()
+        if order_status and order_status['Status'] == 'Closed':
+            raise ValueError("Cannot delete transactions from a closed order.")
+            
+        # 3. Reverse the inventory change
+        weight = trans_to_delete['WeightKg']
+        stock_id = trans_to_delete['StockID']
+        
+        if trans_to_delete['TransactionType'] == 'Issued':
+            # If stock was issued, add it back to inventory
+            db.execute("UPDATE StockItems SET QuantityInStockKg = QuantityInStockKg + ? WHERE StockID = ?", (weight, stock_id))
+        else: # 'Returned'
+            # If stock was returned, remove it from inventory
+            db.execute("UPDATE StockItems SET QuantityInStockKg = QuantityInStockKg - ? WHERE StockID = ?", (weight, stock_id))
+
+        # 4. Delete the transaction
+        db.execute("DELETE FROM StockTransactions WHERE TransactionID = ?", (transaction_id,))
+        
         db.commit()
         return {"success": True}
     except (ValueError, db.Error) as e:

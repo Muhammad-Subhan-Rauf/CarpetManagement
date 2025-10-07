@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getContractorDetails, addGeneralPayment } from '../services/api';
+// MODIFIED: Import more API functions
+import { getContractorDetails, addGeneralPayment, updatePayment, deletePayment } from '../services/api';
 import Card from '../components/Card';
 import Modal from '../components/Modal';
+import { FaEdit, FaTrash } from 'react-icons/fa';
 
 // --- ADDED: Helper function to format dates to PKT ---
 const formatToPkt = (dateString) => {
@@ -34,6 +36,11 @@ const ContractorDetails = () => {
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentNotes, setPaymentNotes] = useState('');
+
+    // ADDED: State for the payment edit modal
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingPayment, setEditingPayment] = useState(null);
+
 
     const fetchData = useCallback(async () => {
         try {
@@ -96,6 +103,43 @@ const ContractorDetails = () => {
             setPaymentNotes('');
             fetchData(); // Refresh data
         } catch(err) { alert(`Error making payment: ${err.message}`); }
+    };
+
+    // --- ADDED: Handlers for editing and deleting payments ---
+    const openEditModal = (payment) => {
+        // Format date to 'YYYY-MM-DD' for the date input field
+        const formattedDate = payment.PaymentDate.split(' ')[0];
+        setEditingPayment({ ...payment, PaymentDate: formattedDate });
+        setIsEditModalOpen(true);
+    };
+    
+    const handleUpdatePayment = async (e) => {
+        e.preventDefault();
+        try {
+            await updatePayment(editingPayment.PaymentID, {
+                amount: editingPayment.Amount,
+                payment_date: editingPayment.PaymentDate,
+                notes: editingPayment.Notes,
+            });
+            alert("Payment updated!");
+            setIsEditModalOpen(false);
+            setEditingPayment(null);
+            fetchData();
+        } catch (err) {
+            alert(`Error updating payment: ${err.message}`);
+        }
+    };
+    
+    const handleDeletePayment = async (paymentId) => {
+        if (window.confirm("Are you sure you want to delete this payment record permanently?")) {
+            try {
+                await deletePayment(paymentId);
+                alert("Payment deleted!");
+                fetchData();
+            } catch (err) {
+                alert(`Error deleting payment: ${err.message}`);
+            }
+        }
     };
     
     if (loading) return <div>Loading contractor details...</div>;
@@ -166,10 +210,19 @@ const ContractorDetails = () => {
                 {activeTab === 'payments' && ( <table className="styled-table"><thead><tr>
                     {/* MODIFIED: Changed header to "Date & Time (PKT)" */}
                     <th>Date & Time (PKT)</th>
-                    <th>Amount (Rs)</th><th>Notes</th><th>Order ID</th></tr></thead><tbody>{payments.map(p => <tr key={p.PaymentID}>
+                    <th>Amount (Rs)</th><th>Notes</th><th>Order ID</th>
+                    {/* ADDED: Actions header */}
+                    <th>Actions</th>
+                    </tr></thead><tbody>{payments.map(p => <tr key={p.PaymentID}>
                         {/* MODIFIED: Format the date string to PKT */}
                         <td>{formatToPkt(p.PaymentDate)}</td>
-                        <td>{p.Amount.toFixed(2)}</td><td>{p.Notes || '-'}</td><td>{p.OrderID || 'General'}</td></tr>)}</tbody></table>)}
+                        <td>{p.Amount.toFixed(2)}</td><td>{p.Notes || '-'}</td><td>{p.OrderID || 'General'}</td>
+                        {/* ADDED: Action buttons for each payment */}
+                        <td>
+                            <button className="button-icon" title="Edit Payment" onClick={() => openEditModal(p)}><FaEdit /></button>
+                            <button className="button-icon-danger" title="Delete Payment" onClick={() => handleDeletePayment(p.PaymentID)}><FaTrash /></button>
+                        </td>
+                        </tr>)}</tbody></table>)}
                 {activeTab === 'transactions' && (
                     <table className="styled-table">
                         {/* MODIFIED: Changed header to "Date & Time (PKT)" */}
@@ -197,6 +250,34 @@ const ContractorDetails = () => {
                     <div className="modal-footer"><button type="button" className="button-secondary" onClick={() => setIsPaymentModalOpen(false)}>Cancel</button><button type="submit" className="button">Record Payment</button></div>
                 </form>
             </Modal>
+            
+            {/* --- ADDED: Modal for editing payments --- */}
+            <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit Payment">
+                {editingPayment && (
+                    <form onSubmit={handleUpdatePayment}>
+                        <div className="form-group">
+                            <label>Amount (Rs)</label>
+                            <input type="number" step="0.01" value={editingPayment.Amount}
+                                   onChange={e => setEditingPayment(p => ({ ...p, Amount: e.target.value }))} required autoFocus />
+                        </div>
+                        <div className="form-group">
+                            <label>Payment Date</label>
+                            <input type="date" value={editingPayment.PaymentDate}
+                                   onChange={e => setEditingPayment(p => ({ ...p, PaymentDate: e.target.value }))} required />
+                        </div>
+                        <div className="form-group">
+                            <label>Notes</label>
+                            <input type="text" value={editingPayment.Notes || ''}
+                                   onChange={e => setEditingPayment(p => ({ ...p, Notes: e.target.value }))} />
+                        </div>
+                        <div className="modal-footer">
+                            <button type="button" className="button-secondary" onClick={() => setIsEditModalOpen(false)}>Cancel</button>
+                            <button type="submit" className="button">Save Changes</button>
+                        </div>
+                    </form>
+                )}
+            </Modal>
+
         </div>
     );
 };

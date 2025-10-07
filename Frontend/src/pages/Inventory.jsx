@@ -2,6 +2,7 @@
 
 // src/pages/Inventory.jsx
 import React, { useState, useEffect, useCallback } from 'react';
+// MODIFIED: getStockItems no longer used directly, api object is used
 import { getStockItems, addStockItem, updateStockItem } from '../services/api';
 import Card from '../components/Card';
 import Modal from '../components/Modal';
@@ -11,6 +12,10 @@ const Inventory = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // ADDED: State for search terms
+  const [qualitySearch, setQualitySearch] = useState('');
+  const [colorSearch, setColorSearch] = useState('');
+
   const [isNewStockModalOpen, setIsNewStockModalOpen] = useState(false);
   const [newStock, setNewStock] = useState({ Type: '', Quality: '', ColorShadeNumber: '', CurrentPricePerKg: '', QuantityInStockKg: '' });
 
@@ -18,10 +23,11 @@ const Inventory = () => {
   const [selectedStock, setSelectedStock] = useState(null);
   const [quantityToAdd, setQuantityToAdd] = useState('');
 
-  const fetchInventory = useCallback(async () => {
+  // MODIFIED: fetchInventory now takes search params and uses them in the API call
+  const fetchInventory = useCallback(async (searchParams = {}) => {
     try {
       setLoading(true);
-      const data = await getStockItems();
+      const data = await getStockItems(searchParams);
       setInventory(data);
       setError(null);
     } catch (err) {
@@ -32,8 +38,18 @@ const Inventory = () => {
   }, []);
 
   useEffect(() => {
-    fetchInventory();
+    fetchInventory(); // Initial fetch with no params
   }, [fetchInventory]);
+
+  // ADDED: Handler for the search form submission
+  const handleSearch = (e) => {
+    e.preventDefault();
+    const params = {};
+    if (qualitySearch) params.search_quality = qualitySearch;
+    if (colorSearch) params.search_color = colorSearch;
+    fetchInventory(params);
+  };
+
 
   const handleNewStockChange = (e) => {
     setNewStock(prevState => ({ ...prevState, [e.target.name]: e.target.value }));
@@ -87,6 +103,27 @@ const Inventory = () => {
         <h1>Inventory Management</h1>
         <button onClick={() => setIsNewStockModalOpen(true)} className="button">Add New Stock Type</button>
       </div>
+
+      {/* --- ADDED: Search Form --- */}
+      <Card>
+        <form onSubmit={handleSearch} className="search-form-grid">
+          <div className="form-group">
+              <label>Quality</label>
+              <input type="text" value={qualitySearch}
+                     onChange={(e) => setQualitySearch(e.target.value)}
+                     placeholder="Search by quality..." />
+          </div>
+          <div className="form-group">
+              <label>Color / Shade #</label>
+              <input type="text" value={colorSearch}
+                     onChange={(e) => setColorSearch(e.target.value)}
+                     placeholder="Search by color/shade..." />
+          </div>
+          <button type="submit" className="button">Search</button>
+        </form>
+      </Card>
+
+
       <Card>
         <table className="styled-table">
           <thead>

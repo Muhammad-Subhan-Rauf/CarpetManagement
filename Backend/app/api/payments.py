@@ -3,7 +3,8 @@
 # /app/api/payments.py
 
 from flask import Blueprint, jsonify, request
-from app.services.payment_service import add_payment
+# MODIFIED: Import more services
+from app.services.payment_service import add_payment, update_payment, delete_payment
 
 payments_bp = Blueprint('payments_api', __name__)
 
@@ -21,3 +22,24 @@ def handle_add_payment():
         return jsonify({"message": "Payment added successfully"}), 200
     else:
         return jsonify({"error": result.get('error', 'Unknown error')}), 400
+
+# ADDED: New route to handle editing and deleting a specific payment
+@payments_bp.route('/payments/<int:payment_id>', methods=['PUT', 'DELETE'])
+def handle_payment_by_id(payment_id):
+    if request.method == 'PUT':
+        data = request.get_json()
+        if not all(k in data for k in ['amount', 'payment_date']):
+             return jsonify({"error": "Missing 'amount' or 'payment_date' field"}), 400
+        
+        result = update_payment(payment_id, data)
+        if result.get('success'):
+            return jsonify({"message": "Payment updated successfully"}), 200
+        else:
+            return jsonify({"error": result.get('error', 'Unknown error')}), 400
+
+    if request.method == 'DELETE':
+        result = delete_payment(payment_id)
+        if result.get('success'):
+            return jsonify({"message": "Payment deleted successfully"}), 204
+        else:
+            return jsonify({"error": result.get('error', 'Unknown error')}), 400

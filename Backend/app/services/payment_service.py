@@ -36,3 +36,44 @@ def add_payment(data):
     except db.Error as e:
         db.rollback()
         return {"success": False, "error": str(e)}
+
+# ADDED: Function to update an existing payment
+def update_payment(payment_id, data):
+    """Updates an existing payment record's amount, date, and notes."""
+    db = get_db()
+    
+    amount = float(data['amount'])
+    payment_date = data['payment_date'] # Expecting 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'
+    notes = data.get('notes', '')
+
+    if not isinstance(amount, (int, float)):
+        return {"success": False, "error": "Invalid payment amount."}
+
+    try:
+        cursor = db.execute(
+            "UPDATE Payments SET Amount = ?, PaymentDate = ?, Notes = ? WHERE PaymentID = ?",
+            (amount, payment_date, notes, payment_id)
+        )
+        if cursor.rowcount == 0:
+            return {"success": False, "error": "Payment not found."}
+        db.commit()
+        export_all_tables_to_excel()
+        return {"success": True}
+    except db.Error as e:
+        db.rollback()
+        return {"success": False, "error": str(e)}
+
+# ADDED: Function to delete a payment
+def delete_payment(payment_id):
+    """Deletes a payment record from the database."""
+    db = get_db()
+    try:
+        cursor = db.execute("DELETE FROM Payments WHERE PaymentID = ?", (payment_id,))
+        if cursor.rowcount == 0:
+            return {"success": False, "error": "Payment not found."}
+        db.commit()
+        export_all_tables_to_excel()
+        return {"success": True}
+    except db.Error as e:
+        db.rollback()
+        return {"success": False, "error": str(e)}

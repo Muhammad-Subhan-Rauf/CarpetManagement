@@ -18,9 +18,16 @@ def handle_stock_items():
             return jsonify(result), 409 # 409 Conflict
         return jsonify({"message": "Stock item added", "id": result['id']}), 201
     
-    # MODIFIED: Accept a 'quality' filter
+    # MODIFIED: Accept a 'quality' filter for new orders and search filters for inventory
     quality_filter = request.args.get('quality')
-    items = stock_service.get_all_stock_items(quality=quality_filter)
+    quality_search = request.args.get('search_quality')
+    color_search = request.args.get('search_color')
+
+    items = stock_service.get_all_stock_items(
+        quality=quality_filter,
+        quality_search=quality_search,
+        color_search=color_search
+    )
     return jsonify(items)
 
 @stock_bp.route('/stock_items/<int:stock_id>', methods=['PUT'])

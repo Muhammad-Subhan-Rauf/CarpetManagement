@@ -6,10 +6,16 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
     getOrderById, getOrderFinancials, getOrderTransactions, getOrderPayments, 
     addPaymentToOrder, getContractors, reassignOrder,
-    getStockItems, issueStockToOrder
+    getStockItems, issueStockToOrder,
+    // ADDED: Payment and Stock modification functions
+    updatePayment, deletePayment,
+    updateStockTransaction, deleteStockTransaction
 } from '../services/api';
 import Card from '../components/Card';
 import Modal from '../components/Modal';
+// ADDED: Icons for edit/delete buttons
+import { FaEdit, FaTrash } from 'react-icons/fa';
+
 
 // --- MODIFIED: Helper component for relative timestamps now formats tooltip to PKT ---
 const RelativeTimestamp = ({ date, referenceDate }) => {
@@ -68,13 +74,30 @@ const OrderDetails = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // ADDED: State to control date display format
+    const [showRelativeDates, setShowRelativeDates] = useState(true);
+
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentNotes, setPaymentNotes] = useState('');
+    
+    // ADDED: State for editing payments
+    const [isEditPaymentModalOpen, setIsEditPaymentModalOpen] = useState(false);
+    const [editingPayment, setEditingPayment] = useState(null);
+
+    // ADDED: State for editing stock transactions
+    const [isEditStockModalOpen, setIsEditStockModalOpen] = useState(false);
+    const [editingStock, setEditingStock] = useState(null);
+
 
     const [isIssueStockModalOpen, setIsIssueStockModalOpen] = useState(false);
     const [availableStock, setAvailableStock] = useState([]);
-    const [stockToAdd, setStockToAdd] = useState({ stock_id: '', weight: '' });
+    // MODIFIED: State now includes a date field
+    const [stockToAdd, setStockToAdd] = useState({ 
+        stock_id: '', 
+        weight: '', 
+        transaction_date: new Date().toISOString().split('T')[0] 
+    });
 
     const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
     const [reassignData, setReassignData] = useState({ new_contractor_id: '', reason: '' });
@@ -98,6 +121,16 @@ const OrderDetails = () => {
     }, [orderId]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
+    
+    // ADDED: Helper function to format absolute dates
+    const formatAbsoluteDate = (date) => {
+        return new Date(date).toLocaleString('en-US', {
+            timeZone: 'Asia/Karachi',
+            year: 'numeric', month: 'short', day: '2-digit',
+            hour: 'numeric', minute: '2-digit', hour12: true,
+        });
+    };
+
 
     const { issuedTransactions, returnedTransactions } = useMemo(() => ({
         issuedTransactions: transactions.filter(t => t.TransactionType === 'Issued'),
@@ -113,6 +146,76 @@ const OrderDetails = () => {
             fetchData();
         } catch(err) { alert(`Error making payment: ${err.message}`); }
     };
+    
+    // --- ADDED: Handlers for editing and deleting payments ---
+    const openEditPaymentModal = (payment) => {
+        const formattedDate = payment.PaymentDate.split(' ')[0]; // YYYY-MM-DD for input
+        setEditingPayment({ ...payment, PaymentDate: formattedDate });
+        setIsEditPaymentModalOpen(true);
+    };
+
+    const handleUpdatePayment = async (e) => {
+        e.preventDefault();
+        try {
+            await updatePayment(editingPayment.PaymentID, {
+                amount: editingPayment.Amount,
+                payment_date: editingPayment.PaymentDate,
+                notes: editingPayment.Notes,
+            });
+            alert("Payment updated!");
+            setIsEditPaymentModalOpen(false);
+            fetchData();
+        } catch (err) {
+            alert(`Error updating payment: ${err.message}`);
+        }
+    };
+    
+    const handleDeletePayment = async (paymentId) => {
+        if (window.confirm("Are you sure you want to permanently delete this payment?")) {
+            try {
+                await deletePayment(paymentId);
+                alert("Payment deleted.");
+                fetchData();
+            } catch (err) {
+                alert(`Error deleting payment: ${err.message}`);
+            }
+        }
+    };
+
+    // --- ADDED: Handlers for editing and deleting stock transactions ---
+    const openEditStockModal = (stockTransaction) => {
+        const formattedDate = stockTransaction.TransactionDate.split(' ')[0];
+        setEditingStock({ ...stockTransaction, TransactionDate: formattedDate });
+        setIsEditStockModalOpen(true);
+    };
+    
+    const handleUpdateStock = async (e) => {
+        e.preventDefault();
+        try {
+            await updateStockTransaction(editingStock.TransactionID, {
+                weight: editingStock.WeightKg,
+                date: editingStock.TransactionDate
+            });
+            alert("Stock transaction updated!");
+            setIsEditStockModalOpen(false);
+            fetchData();
+        } catch (err) {
+            alert(`Error updating transaction: ${err.message}`);
+        }
+    };
+    
+    const handleDeleteStock = async (transactionId) => {
+        if (window.confirm("Are you sure you want to delete this stock transaction? This will add the stock back to your inventory.")) {
+            try {
+                await deleteStockTransaction(transactionId);
+                alert("Transaction deleted.");
+                fetchData();
+            } catch (err) {
+                alert(`Error deleting transaction: ${err.message}`);
+            }
+        }
+    };
+
 
     const handleReassign = async (e) => {
         e.preventDefault();
@@ -132,7 +235,8 @@ const OrderDetails = () => {
     const openIssueStockModal = async () => {
         if (order?.Quality) {
             try {
-                const stock = await getStockItems(order.Quality);
+                // MODIFIED: Pass params object to API call
+                const stock = await getStockItems({ quality: order.Quality });
                 setAvailableStock(stock);
                 setIsIssueStockModalOpen(true);
             } catch (err) {
@@ -149,10 +253,12 @@ const OrderDetails = () => {
             return alert("Please select a stock item and enter a valid, positive weight.");
         }
         try {
+            // MODIFIED: The entire stockToAdd object (including date) is sent
             await issueStockToOrder(orderId, stockToAdd);
             alert("Stock issued successfully!");
             setIsIssueStockModalOpen(false);
-            setStockToAdd({ stock_id: '', weight: '' });
+            // MODIFIED: Reset state including the date
+            setStockToAdd({ stock_id: '', weight: '', transaction_date: new Date().toISOString().split('T')[0] });
             fetchData(); 
         } catch (err) {
             alert(`Error issuing stock: ${err.message}`);
@@ -170,6 +276,10 @@ const OrderDetails = () => {
                 <div>
                     {order.Status === 'Open' && (<button className="button-secondary" onClick={() => setIsReassignModalOpen(true)}>Change Contractor</button>)}
                     {order.Status === 'Open' && (<button className="button-secondary" style={{marginLeft: '10px'}} onClick={openIssueStockModal}>Issue More Stock</button>)}
+                    {/* ADDED: Date toggle button */}
+                    <button className="button-secondary" style={{marginLeft: '10px'}} onClick={() => setShowRelativeDates(prev => !prev)}>
+                        Toggle Dates
+                    </button>
                     {order.Status === 'Open' && (<Link to={`/order/${orderId}/complete`} className="button">Complete Order</Link>)}
                 </div>
             </div>
@@ -196,38 +306,75 @@ const OrderDetails = () => {
                 <Card title="Payment History">
                      {payments.length > 0 ? (<table className="styled-table-small">
                         {/* MODIFIED: Header changed to "Date" */}
-                        <thead><tr><th>Date</th><th>Amount</th><th>Notes</th></tr></thead>
+                        <thead><tr><th>Date</th><th>Amount</th><th>Notes</th><th>Actions</th></tr></thead>
                         <tbody>{payments.map(p=><tr key={p.PaymentID}>
-                            {/* MODIFIED: Use RelativeTimestamp component */}
-                            <td><RelativeTimestamp date={p.PaymentDate} referenceDate={order.DateIssued} /></td>
-                            <td>{p.Amount.toFixed(2)}</td><td>{p.Notes || '-'}</td></tr>)}</tbody>
+                            {/* MODIFIED: Conditionally render date format */}
+                            <td>
+                               {showRelativeDates 
+                                   ? <RelativeTimestamp date={p.PaymentDate} referenceDate={order.DateIssued} />
+                                   : formatAbsoluteDate(p.PaymentDate)
+                               }
+                            </td>
+                            <td>{p.Amount.toFixed(2)}</td>
+                            <td>{p.Notes || '-'}</td>
+                            {/* ADDED: Action buttons for payments */}
+                            <td>
+                                <button className="button-icon" title="Edit" onClick={() => openEditPaymentModal(p)}><FaEdit/></button>
+                                <button className="button-icon-danger" title="Delete" onClick={() => handleDeletePayment(p.PaymentID)}><FaTrash/></button>
+                            </td>
+                            </tr>)}</tbody>
                         </table>) : <p>No payments recorded.</p>}
                 </Card>
                 <Card title="Stock Issued">
                     <table className="styled-table-small">
-                        {/* MODIFIED: Header changed to "Date" */}
-                        <thead><tr><th>Date</th><th>Desc.</th><th>Weight</th><th>Value</th></tr></thead>
+                        {/* MODIFIED: Added Actions header */}
+                        <thead><tr><th>Date</th><th>Desc.</th><th>Weight</th><th>Value</th><th>Actions</th></tr></thead>
                         <tbody>
                             {issuedTransactions.map(t=><tr key={t.TransactionID}>
-                                {/* MODIFIED: Use RelativeTimestamp component */}
-                                <td><RelativeTimestamp date={t.TransactionDate} referenceDate={order.DateIssued} /></td>
+                                {/* MODIFIED: Conditionally render date format */}
+                                <td>
+                                    {showRelativeDates
+                                        ? <RelativeTimestamp date={t.TransactionDate} referenceDate={order.DateIssued} />
+                                        : formatAbsoluteDate(t.TransactionDate)
+                                    }
+                                </td>
                                 <td>{t.Type} ({t.Quality}) {t.ColorShadeNumber && `- ${t.ColorShadeNumber}`}</td>
                                 <td>{t.WeightKg.toFixed(3)}kg</td>
                                 <td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td>
+                                {/* ADDED: Action buttons for stock transactions */}
+                                <td>
+                                    {order.Status === 'Open' && <>
+                                        <button className="button-icon" title="Edit" onClick={() => openEditStockModal(t)}><FaEdit/></button>
+                                        <button className="button-icon-danger" title="Delete" onClick={() => handleDeleteStock(t.TransactionID)}><FaTrash/></button>
+                                    </>}
+                                </td>
                             </tr>)}
                         </tbody>
                     </table>
                 </Card>
                 <Card title="Stock Returned">
                      {returnedTransactions.length > 0 ? (<table className="styled-table-small">
-                        {/* MODIFIED: Header changed to "Date" */}
-                        <thead><tr><th>Date</th><th>Desc.</th><th>Weight</th><th>Value</th><th>Notes</th></tr></thead>
+                        {/* MODIFIED: Added Actions header */}
+                        <thead><tr><th>Date</th><th>Desc.</th><th>Weight</th><th>Value</th><th>Notes</th><th>Actions</th></tr></thead>
                         <tbody>
                         {returnedTransactions.map(t=><tr key={t.TransactionID}>
-                            {/* MODIFIED: Use RelativeTimestamp component */}
-                            <td><RelativeTimestamp date={t.TransactionDate} referenceDate={order.DateIssued} /></td>
+                             {/* MODIFIED: Conditionally render date format */}
+                            <td>
+                                {showRelativeDates
+                                    ? <RelativeTimestamp date={t.TransactionDate} referenceDate={order.DateIssued} />
+                                    : formatAbsoluteDate(t.TransactionDate)
+                                }
+                            </td>
                             <td>{t.Type} ({t.Quality}) {t.ColorShadeNumber && `- ${t.ColorShadeNumber}`}</td>
-                            <td>{t.WeightKg.toFixed(3)}kg</td><td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td><td>{t.Notes}</td></tr>)}
+                            <td>{t.WeightKg.toFixed(3)}kg</td><td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td><td>{t.Notes}</td>
+                             {/* ADDED: Action buttons for stock transactions */}
+                            <td>
+                                {order.Status === 'Open' && <>
+                                    <button className="button-icon" title="Edit" onClick={() => openEditStockModal(t)}><FaEdit/></button>
+                                    <button className="button-icon-danger" title="Delete" onClick={() => handleDeleteStock(t.TransactionID)}><FaTrash/></button>
+                                </>}
+                            </td>
+                        </tr>)}
                     </tbody></table>) : <p>No stock returned yet.</p>}
                 </Card>
             </div>
@@ -236,6 +383,57 @@ const OrderDetails = () => {
                 <form onSubmit={handleMakePayment}><p>Pending Amount: <strong>Rs {financials.AmountPending.toFixed(2)}</strong></p><div className="form-group"><label>Amount (Rs)</label><input type="number" step="0.01" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} required autoFocus /></div><div className="form-group"><label>Notes</label><input type="text" value={paymentNotes} onChange={e => setPaymentNotes(e.target.value)} /></div><div className="modal-footer"><button type="button" className="button-secondary" onClick={() => setIsPaymentModalOpen(false)}>Cancel</button><button type="submit" className="button">Record Payment</button></div></form>
             </Modal>
             
+            {/* --- ADDED: Modal for editing payments --- */}
+            <Modal isOpen={isEditPaymentModalOpen} onClose={() => setIsEditPaymentModalOpen(false)} title="Edit Payment">
+                {editingPayment && (
+                    <form onSubmit={handleUpdatePayment}>
+                        <div className="form-group">
+                            <label>Amount (Rs)</label>
+                            <input type="number" step="0.01" value={editingPayment.Amount}
+                                   onChange={e => setEditingPayment(p => ({ ...p, Amount: e.target.value }))} required />
+                        </div>
+                        <div className="form-group">
+                            <label>Payment Date</label>
+                            <input type="date" value={editingPayment.PaymentDate}
+                                   onChange={e => setEditingPayment(p => ({ ...p, PaymentDate: e.target.value }))} required />
+                        </div>
+                        <div className="form-group">
+                            <label>Notes</label>
+                            <input type="text" value={editingPayment.Notes || ''}
+                                   onChange={e => setEditingPayment(p => ({ ...p, Notes: e.target.value }))} />
+                        </div>
+                        <div className="modal-footer">
+                            <button type="button" className="button-secondary" onClick={() => setIsEditPaymentModalOpen(false)}>Cancel</button>
+                            <button type="submit" className="button">Save Changes</button>
+                        </div>
+                    </form>
+                )}
+            </Modal>
+
+            {/* --- ADDED: Modal for editing stock transactions --- */}
+            <Modal isOpen={isEditStockModalOpen} onClose={() => setIsEditStockModalOpen(false)} title="Edit Stock Transaction">
+                {editingStock && (
+                     <form onSubmit={handleUpdateStock}>
+                        <p><strong>Item:</strong> {editingStock.Type} ({editingStock.Quality})</p>
+                        <div className="form-group">
+                            <label>Weight (kg)</label>
+                            <input type="number" step="0.001" value={editingStock.WeightKg}
+                                   onChange={e => setEditingStock(s => ({...s, WeightKg: e.target.value}))} required />
+                        </div>
+                         <div className="form-group">
+                            <label>Transaction Date</label>
+                            <input type="date" value={editingStock.TransactionDate}
+                                   onChange={e => setEditingStock(s => ({...s, TransactionDate: e.target.value}))} required />
+                        </div>
+                        <div className="modal-footer">
+                            <button type="button" className="button-secondary" onClick={() => setIsEditStockModalOpen(false)}>Cancel</button>
+                            <button type="submit" className="button">Save Changes</button>
+                        </div>
+                     </form>
+                )}
+            </Modal>
+
+
             <Modal isOpen={isReassignModalOpen} onClose={() => setIsReassignModalOpen(false)} title="Reassign Contractor">
                 <form onSubmit={handleReassign}>
                     <div className="form-group">
@@ -280,6 +478,11 @@ const OrderDetails = () => {
                     <div className="form-group">
                         <label>Weight to Issue (kg)</label>
                         <input type="number" step="0.001" value={stockToAdd.weight} onChange={e => setStockToAdd(p => ({...p, weight: e.target.value}))} required />
+                    </div>
+                    {/* ADDED: Date input for transaction */}
+                    <div className="form-group">
+                        <label>Date of Issuance</label>
+                        <input type="date" value={stockToAdd.transaction_date} onChange={e => setStockToAdd(p => ({...p, transaction_date: e.target.value}))} required />
                     </div>
                     <div className="modal-footer">
                         <button type="button" className="button-secondary" onClick={() => setIsIssueStockModalOpen(false)}>Cancel</button>

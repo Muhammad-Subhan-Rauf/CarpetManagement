@@ -45,9 +45,10 @@ export const addContractor = (data) => fetchApi('/contractors', { method: 'POST'
 export const getContractorDetails = (contractorId) => fetchApi(`/contractors/${contractorId}`);
 
 // Stock APIs
-export const getStockItems = (quality = '') => {
-    const params = new URLSearchParams({ quality });
-    return fetchApi(`/stock_items?${params.toString()}`);
+// MODIFIED: getStockItems now accepts a params object for flexible filtering.
+export const getStockItems = (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return fetchApi(`/stock_items?${query}`);
 };
 export const addStockItem = (data) => fetchApi('/stock_items', { method: 'POST', body: JSON.stringify(data) });
 export const updateStockItem = (stockId, data) => fetchApi(`/stock_items/${stockId}`, { method: 'PUT', body: JSON.stringify(data) });
@@ -87,3 +88,11 @@ export const issueStockToOrder = (orderId, data) => fetchApi(`/orders/${orderId}
 // General & Specific Payment API
 export const addGeneralPayment = (data) => fetchApi('/payments', { method: 'POST', body: JSON.stringify(data) });
 export const addPaymentToOrder = (data) => fetchApi('/payments', { method: 'POST', body: JSON.stringify(data) });
+
+// ADDED: API calls for updating and deleting payments
+export const updatePayment = (paymentId, data) => fetchApi(`/payments/${paymentId}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deletePayment = (paymentId) => fetchApi(`/payments/${paymentId}`, { method: 'DELETE' });
+
+// ADDED: API calls for stock transaction CRUD
+export const updateStockTransaction = (transactionId, data) => fetchApi(`/stock-transactions/${transactionId}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteStockTransaction = (transactionId) => fetchApi(`/stock-transactions/${transactionId}`, { method: 'DELETE' });

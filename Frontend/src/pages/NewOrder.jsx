@@ -40,7 +40,8 @@ const NewOrder = () => {
         return;
     }
     try {
-        const inventoryData = await getStockItems(quality);
+        // MODIFIED: Pass quality in a params object
+        const inventoryData = await getStockItems({ quality });
         setAvailableInventory(inventoryData);
     } catch (error) {
         alert(`Failed to load stock for quality ${quality}: ${error.message}`);
@@ -60,7 +61,8 @@ const NewOrder = () => {
   });
 
   const [issuedStock, setIssuedStock] = useState([]);
-  const [stockToAdd, setStockToAdd] = useState({ StockID: '', weight: '' });
+  // MODIFIED: stockToAdd now includes a date
+  const [stockToAdd, setStockToAdd] = useState({ StockID: '', weight: '', date: new Date().toISOString().split('T')[0] });
 
   const handleOrderDataChange = (e) => {
     const { name, value } = e.target;
@@ -94,8 +96,10 @@ const NewOrder = () => {
     const alreadyIssued = issuedStock.filter(s => s.StockID === stockItem.StockID).reduce((sum, s) => sum + s.WeightKg, 0);
     if (weight + alreadyIssued > stockItem.QuantityInStockKg) return alert(`Not enough stock. Available: ${(stockItem.QuantityInStockKg - alreadyIssued).toFixed(3)}kg`);
     
-    setIssuedStock(prev => [...prev, { ...stockItem, WeightKg: weight }]);
-    setStockToAdd({ StockID: '', weight: '' });
+    // MODIFIED: Add the transaction date to the issued stock item
+    setIssuedStock(prev => [...prev, { ...stockItem, WeightKg: weight, TransactionDate: stockToAdd.date }]);
+    // Reset date to today for the next item
+    setStockToAdd({ StockID: '', weight: '', date: new Date().toISOString().split('T')[0] });
   };
   
   const removeStockItem = (index) => setIssuedStock(prev => prev.filter((_, i) => i !== index));
@@ -111,7 +115,12 @@ const NewOrder = () => {
 
     const payload = {
       ...finalOrderData,
-      transactions: issuedStock.map(s => ({ StockID: s.StockID, WeightKg: s.WeightKg })),
+      // MODIFIED: The transaction payload now includes the custom date
+      transactions: issuedStock.map(s => ({ 
+          StockID: s.StockID, 
+          WeightKg: s.WeightKg,
+          transaction_date: s.TransactionDate
+      })),
     };
     
     try {
@@ -159,7 +168,8 @@ const NewOrder = () => {
 
       {step === 2 && (
         <Card title={`Step 2: Issue Stock (Quality: ${orderData.Quality})`}>
-          <div className="stock-issue-form">
+          {/* MODIFIED: The form now has a date input and is a 3-column grid */}
+          <div className="stock-issue-form form-grid-3">
             <div className="form-group"><label>Select Stock</label>
               <select name="StockID" value={stockToAdd.StockID} onChange={handleStockFormChange}>
                 <option value="" disabled>-- Select Stock --</option>
@@ -173,10 +183,17 @@ const NewOrder = () => {
               </select>
             </div>
             <div className="form-group"><label>Weight (kg)</label><input type="number" step="0.001" name="weight" value={stockToAdd.weight} onChange={handleStockFormChange}/></div>
-            <button type="button" className="button" onClick={handleAddStockToOrder}>Add Stock</button>
+            {/* ADDED: Date input for the transaction */}
+            <div className="form-group"><label>Date</label><input type="date" name="date" value={stockToAdd.date} onChange={handleStockFormChange}/></div>
+            
+            <div style={{ gridColumn: 'span 3' }}>
+              <button type="button" className="button" onClick={handleAddStockToOrder}>Add Stock to Order</button>
+            </div>
           </div><hr/>
+
           <h3>Stock to be Issued</h3>
-          {issuedStock.length > 0 ? (<table className="styled-table"><thead><tr><th>Desc.</th><th>Weight</th><th>Action</th></tr></thead><tbody>{issuedStock.map((s,i)=>(<tr key={i}><td>{s.Type} ({s.Quality}) {s.ColorShadeNumber && `- ${s.ColorShadeNumber}`}</td><td>{s.WeightKg.toFixed(3)}kg</td><td><button onClick={()=>removeStockItem(i)} className="button-icon-danger"><FaTrash/></button></td></tr>))}</tbody></table>) : <p>No stock added yet.</p>}
+          {/* MODIFIED: Table now shows transaction date */}
+          {issuedStock.length > 0 ? (<table className="styled-table"><thead><tr><th>Date</th><th>Desc.</th><th>Weight</th><th>Action</th></tr></thead><tbody>{issuedStock.map((s,i)=>(<tr key={i}><td>{s.TransactionDate}</td><td>{s.Type} ({s.Quality}) {s.ColorShadeNumber && `- ${s.ColorShadeNumber}`}</td><td>{s.WeightKg.toFixed(3)}kg</td><td><button onClick={()=>removeStockItem(i)} className="button-icon-danger"><FaTrash/></button></td></tr>))}</tbody></table>) : <p>No stock added yet.</p>}
           <div className="step-navigation"><button className="button-secondary" onClick={()=>setStep(1)}>Back</button><button className="button" onClick={()=>setStep(3)} disabled={issuedStock.length===0}>Next: Review</button></div>
         </Card>
       )}
@@ -187,9 +204,9 @@ const NewOrder = () => {
             <p><strong>Contractor:</strong> {contractors.find(c=>c.ContractorID===parseInt(orderData.ContractorID))?.Name}</p>
             <p><strong>Wage:</strong> Rs {(orderData.Length * orderData.Width * orderData.PricePerSqFt || 0).toFixed(2)}</p>
             <hr/><h4>Stock to be Issued</h4>
-            <table className="styled-table"><thead><tr><th>Desc.</th><th>Weight</th><th>Value</th></tr></thead><tbody>
-                {issuedStock.map((s,i)=>(<tr key={i}><td>{s.Type} ({s.Quality}) {s.ColorShadeNumber && `- ${s.ColorShadeNumber}`}</td><td>{s.WeightKg.toFixed(3)}</td><td>Rs {(s.WeightKg * s.CurrentPricePerKg).toFixed(2)}</td></tr>))}
-                <tr><td colSpan="2" style={{textAlign:'right',fontWeight:'bold'}}>Total Stock Value</td><td style={{fontWeight:'bold'}}>Rs {issuedStock.reduce((sum,s) => sum + (s.WeightKg * s.CurrentPricePerKg), 0).toFixed(2)}</td></tr>
+            <table className="styled-table"><thead><tr><th>Date</th><th>Desc.</th><th>Weight</th><th>Value</th></tr></thead><tbody>
+                {issuedStock.map((s,i)=>(<tr key={i}><td>{s.TransactionDate}</td><td>{s.Type} ({s.Quality}) {s.ColorShadeNumber && `- ${s.ColorShadeNumber}`}</td><td>{s.WeightKg.toFixed(3)}</td><td>Rs {(s.WeightKg * s.CurrentPricePerKg).toFixed(2)}</td></tr>))}
+                <tr><td colSpan="3" style={{textAlign:'right',fontWeight:'bold'}}>Total Stock Value</td><td style={{fontWeight:'bold'}}>Rs {issuedStock.reduce((sum,s) => sum + (s.WeightKg * s.CurrentPricePerKg), 0).toFixed(2)}</td></tr>
             </tbody></table>
           <div className="step-navigation"><button className="button-secondary" onClick={()=>setStep(2)}>Back</button><button className="button" onClick={handleCreateOrder}>Confirm & Create Order</button></div>
         </Card>
