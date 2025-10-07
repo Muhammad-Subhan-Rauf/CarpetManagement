@@ -176,7 +176,7 @@ const NewOrder = () => {
             <button type="button" className="button" onClick={handleAddStockToOrder}>Add Stock</button>
           </div><hr/>
           <h3>Stock to be Issued</h3>
-          {issuedStock.length > 0 ? (<table className="styled-table"><thead><tr><th>Desc.</th><th>Weight</th><th>Action</th></tr></thead><tbody>{issuedStock.map((s,i)=>(<tr key={i}><td>{s.Type} ({s.Quality})</td><td>{s.WeightKg.toFixed(3)}kg</td><td><button onClick={()=>removeStockItem(i)} className="button-icon-danger"><FaTrash/></button></td></tr>))}</tbody></table>) : <p>No stock added yet.</p>}
+          {issuedStock.length > 0 ? (<table className="styled-table"><thead><tr><th>Desc.</th><th>Weight</th><th>Action</th></tr></thead><tbody>{issuedStock.map((s,i)=>(<tr key={i}><td>{s.Type} ({s.Quality}) {s.ColorShadeNumber && `- ${s.ColorShadeNumber}`}</td><td>{s.WeightKg.toFixed(3)}kg</td><td><button onClick={()=>removeStockItem(i)} className="button-icon-danger"><FaTrash/></button></td></tr>))}</tbody></table>) : <p>No stock added yet.</p>}
           <div className="step-navigation"><button className="button-secondary" onClick={()=>setStep(1)}>Back</button><button className="button" onClick={()=>setStep(3)} disabled={issuedStock.length===0}>Next: Review</button></div>
         </Card>
       )}
@@ -188,7 +188,7 @@ const NewOrder = () => {
             <p><strong>Wage:</strong> Rs {(orderData.Length * orderData.Width * orderData.PricePerSqFt || 0).toFixed(2)}</p>
             <hr/><h4>Stock to be Issued</h4>
             <table className="styled-table"><thead><tr><th>Desc.</th><th>Weight</th><th>Value</th></tr></thead><tbody>
-                {issuedStock.map((s,i)=>(<tr key={i}><td>{s.Type} ({s.Quality})</td><td>{s.WeightKg.toFixed(3)}</td><td>Rs {(s.WeightKg * s.CurrentPricePerKg).toFixed(2)}</td></tr>))}
+                {issuedStock.map((s,i)=>(<tr key={i}><td>{s.Type} ({s.Quality}) {s.ColorShadeNumber && `- ${s.ColorShadeNumber}`}</td><td>{s.WeightKg.toFixed(3)}</td><td>Rs {(s.WeightKg * s.CurrentPricePerKg).toFixed(2)}</td></tr>))}
                 <tr><td colSpan="2" style={{textAlign:'right',fontWeight:'bold'}}>Total Stock Value</td><td style={{fontWeight:'bold'}}>Rs {issuedStock.reduce((sum,s) => sum + (s.WeightKg * s.CurrentPricePerKg), 0).toFixed(2)}</td></tr>
             </tbody></table>
           <div className="step-navigation"><button className="button-secondary" onClick={()=>setStep(2)}>Back</button><button className="button" onClick={handleCreateOrder}>Confirm & Create Order</button></div>

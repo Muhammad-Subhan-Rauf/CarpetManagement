@@ -1,3 +1,5 @@
+// Original relative path: pages/Inventory.jsx
+
 // src/pages/Inventory.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { getStockItems, addStockItem, updateStockItem } from '../services/api';
@@ -114,7 +116,7 @@ const Inventory = () => {
         </form>
       </Modal>
 
-      <Modal isOpen={isAddQuantityModalOpen} onClose={closeModals} title={`Add Quantity to ${selectedStock?.Type} (${selectedStock?.Quality})`}>
+      <Modal isOpen={isAddQuantityModalOpen} onClose={closeModals} title={`Add Quantity to ${selectedStock?.Type} (${selectedStock?.Quality}) ${selectedStock?.ColorShadeNumber || ''}`}>
         <form onSubmit={handleAddQuantity}>
            <p>Current Quantity: <strong>{selectedStock?.QuantityInStockKg.toFixed(3)} kg</strong></p>
            <div className="form-group"><label>Quantity to Add (Kg)</label><input type="number" step="0.001" value={quantityToAdd} onChange={(e) => setQuantityToAdd(e.target.value)} required autoFocus /></div>

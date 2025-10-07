@@ -121,7 +121,7 @@ const ContractorDetails = () => {
                     {currently_held_stock.length > 0 ? (
                         <table className="styled-table-small">
                             <thead><tr><th>Stock</th><th>Net Weight (kg)</th></tr></thead>
-                            <tbody>{currently_held_stock.map((s, i) => (<tr key={i}><td>{s.Type} ({s.Quality})</td><td>{s.NetWeightKg.toFixed(3)}</td></tr>))}</tbody>
+                            <tbody>{currently_held_stock.map((s, i) => (<tr key={i}><td>{s.Type} ({s.Quality}) {s.ColorShadeNumber && `- ${s.ColorShadeNumber}`}</td><td>{s.NetWeightKg.toFixed(3)}</td></tr>))}</tbody>
                         </table>
                     ) : <p>No stock currently held.</p>}
                 </Card>
@@ -147,7 +147,7 @@ const ContractorDetails = () => {
                 </div>
                 {activeTab === 'orders' && (<table className="styled-table"><thead><tr><th>Design #</th><th>Quality</th><th>Wage</th><th>Status</th><th>Action</th></tr></thead><tbody>{orders.map(o => (<tr key={o.OrderID}><td>{o.DesignNumber}</td><td>{o.Quality}</td><td>Rs {o.Wage?.toFixed(2) || '0.00'}</td><td><span className={`status-badge status-${o.Status}`}>{o.Status}</span></td><td><Link to={`/order/${o.OrderID}`} className="button-small">View</Link></td></tr>))}</tbody></table>)}
                 {activeTab === 'payments' && ( <table className="styled-table"><thead><tr><th>Date</th><th>Amount (Rs)</th><th>Notes</th><th>Order ID</th></tr></thead><tbody>{payments.map(p => <tr key={p.PaymentID}><td>{p.PaymentDate}</td><td>{p.Amount.toFixed(2)}</td><td>{p.Notes || '-'}</td><td>{p.OrderID || 'General'}</td></tr>)}</tbody></table>)}
-                {activeTab === 'transactions' && (<table className="styled-table"><thead><tr><th>Order ID</th><th>Type</th><th>Description</th><th>Weight</th><th>Value</th><th>Notes</th></tr></thead><tbody>{transactions.map(t => <tr key={t.TransactionID}><td>{t.OrderID}</td><td><span className={`status-badge status-${t.TransactionType}`}>{t.TransactionType}</span></td><td>{t.Type} ({t.StockQuality})</td><td>{t.WeightKg.toFixed(3)}</td><td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td><td>{t.Notes || '-'}</td></tr>)}</tbody></table>)}
+                {activeTab === 'transactions' && (<table className="styled-table"><thead><tr><th>Order ID</th><th>Type</th><th>Description</th><th>Weight</th><th>Value</th><th>Notes</th></tr></thead><tbody>{transactions.map(t => <tr key={t.TransactionID}><td>{t.OrderID}</td><td><span className={`status-badge status-${t.TransactionType}`}>{t.TransactionType}</span></td><td>{t.Type} ({t.StockQuality}) {t.ColorShadeNumber && `- ${t.ColorShadeNumber}`}</td><td>{t.WeightKg.toFixed(3)}</td><td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td><td>{t.Notes || '-'}</td></tr>)}</tbody></table>)}
             </Card>
 
             <Modal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} title={`Pay ${contractor.Name}`}>

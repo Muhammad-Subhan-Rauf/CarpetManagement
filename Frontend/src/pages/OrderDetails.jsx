@@ -107,12 +107,12 @@ const OrderDetails = () => {
                 </Card>
                 <Card title="Stock Issued">
                     <table className="styled-table-small"><thead><tr><th>Desc.</th><th>Weight</th><th>Value</th></tr></thead><tbody>
-                        {issuedTransactions.map(t=><tr key={t.TransactionID}><td>{t.Type} ({t.Quality})</td><td>{t.WeightKg.toFixed(3)}kg</td><td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td></tr>)}
+                        {issuedTransactions.map(t=><tr key={t.TransactionID}><td>{t.Type} ({t.Quality}) {t.ColorShadeNumber && `- ${t.ColorShadeNumber}`}</td><td>{t.WeightKg.toFixed(3)}kg</td><td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td></tr>)}
                     </tbody></table>
                 </Card>
                 <Card title="Stock Returned">
                      {returnedTransactions.length > 0 ? (<table className="styled-table-small"><thead><tr><th>Desc.</th><th>Weight</th><th>Value</th><th>Notes</th></tr></thead><tbody>
-                        {returnedTransactions.map(t=><tr key={t.TransactionID}><td>{t.Type} ({t.Quality})</td><td>{t.WeightKg.toFixed(3)}kg</td><td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td><td>{t.Notes}</td></tr>)}
+                        {returnedTransactions.map(t=><tr key={t.TransactionID}><td>{t.Type} ({t.Quality}) {t.ColorShadeNumber && `- ${t.ColorShadeNumber}`}</td><td>{t.WeightKg.toFixed(3)}kg</td><td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td><td>{t.Notes}</td></tr>)}
                     </tbody></table>) : <p>No stock returned yet.</p>}
                 </Card>
             </div>

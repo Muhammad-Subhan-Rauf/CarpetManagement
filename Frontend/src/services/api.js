@@ -1,7 +1,4 @@
-// Original relative path: src/services/api.js
-
 // src/services/api.js
-
 const API_HOST = 'http://127.0.0.1';
 const DEFAULT_PORT = '55000';
 
@@ -77,6 +74,11 @@ export const returnStockForOrder = (orderId, stock_id, weight) => fetchApi(`/ord
 });
 // NEW: API call for reassigning an order
 export const reassignOrder = (orderId, data) => fetchApi(`/orders/${orderId}/reassign`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+});
+// NEW: API call for issuing more stock to an order
+export const issueStockToOrder = (orderId, data) => fetchApi(`/orders/${orderId}/issue-stock`, {
     method: 'POST',
     body: JSON.stringify(data)
 });

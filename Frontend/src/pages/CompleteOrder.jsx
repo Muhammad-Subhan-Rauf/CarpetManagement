@@ -1,3 +1,5 @@
+// Original relative path: pages/CompleteOrder.jsx
+
 // Original relative path: src/pages/CompleteOrder.jsx
 
 // src/pages/CompleteOrder.jsx
@@ -208,7 +210,7 @@ const CompleteOrder = () => {
           <Card title="2. Reconcile Stock">
             {outstandingStock.length > 0 ? outstandingStock.map(stock => (
                 <div key={stock.StockID} className="reconciliation-item">
-                    <strong>{stock.Type} ({stock.Quality})</strong>
+                    <strong>{stock.Type} ({stock.Quality}) {stock.ColorShadeNumber && `- ${stock.ColorShadeNumber}`}</strong>
                     <small>Outstanding: {stock.net_weight.toFixed(3)}kg</small>
                     <div className="form-group-inline"><label>Returned (kg)</label><input type="number" step="0.001" placeholder="To inventory" value={reconciliation[stock.StockID]?.weight_returned || ''} onChange={(e) => handleReconChange(stock.StockID, 'weight_returned', e.target.value)} /></div>
                     <div className="form-group-inline"><label>Kept (kg)</label><input type="number" step="0.001" placeholder="By contractor" value={reconciliation[stock.StockID]?.weight_kept || ''} onChange={(e) => handleReconChange(stock.StockID, 'weight_kept', e.target.value)} /></div>
