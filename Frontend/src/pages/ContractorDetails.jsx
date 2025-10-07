@@ -1,4 +1,4 @@
-// Original relative path: pages/ContractorDetails.jsx
+// Original relative path: src/pages/ContractorDetails.jsx
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
@@ -11,7 +11,8 @@ import { FaEdit, FaTrash } from 'react-icons/fa';
 // --- ADDED: Helper function to format dates to PKT ---
 const formatToPkt = (dateString) => {
   if (!dateString) return 'N/A';
-  return new Date(dateString).toLocaleString('en-US', {
+  // MODIFIED: Ensure the date string is parsed as UTC before converting
+  return new Date(dateString.replace(' ', 'T') + 'Z').toLocaleString('en-US', {
     timeZone: 'Asia/Karachi',
     year: 'numeric',
     month: 'short',

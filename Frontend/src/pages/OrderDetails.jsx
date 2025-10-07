@@ -1,6 +1,5 @@
-// Original relative path: pages/OrderDetails.jsx
+// Original relative path: src/pages/OrderDetails.jsx
 
-// src/pages/OrderDetails.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
@@ -21,9 +20,10 @@ import { FaEdit, FaTrash } from 'react-icons/fa';
 const RelativeTimestamp = ({ date, referenceDate }) => {
   const getRelativeDays = (dateStr, referenceDateStr) => {
     if (!dateStr || !referenceDateStr) return null;
-    const date = new Date(dateStr);
-    // FIXED: Corrected the constructor from new 'Date' to new Date
-    const reference = new Date(referenceDateStr);
+    // MODIFIED: Ensure the date string is parsed as UTC
+    const date = new Date(dateStr.replace(' ', 'T') + 'Z');
+    // FIXED: Corrected the constructor from new 'Date' to new Date and parse as UTC
+    const reference = new Date(referenceDateStr.replace(' ', 'T') + 'Z');
     
     // Reset time to compare dates only
     date.setHours(0, 0, 0, 0);
@@ -124,7 +124,8 @@ const OrderDetails = () => {
     
     // ADDED: Helper function to format absolute dates
     const formatAbsoluteDate = (date) => {
-        return new Date(date).toLocaleString('en-US', {
+        // MODIFIED: Ensure the date string is parsed as UTC
+        return new Date(date.replace(' ', 'T') + 'Z').toLocaleString('en-US', {
             timeZone: 'Asia/Karachi',
             year: 'numeric', month: 'short', day: '2-digit',
             hour: 'numeric', minute: '2-digit', hour12: true,

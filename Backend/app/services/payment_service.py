@@ -4,7 +4,7 @@
 
 from app.database.db import get_db
 from app.services.excel_service import export_all_tables_to_excel
-import datetime
+from datetime import datetime, timezone
 
 def add_payment(data):
     """
@@ -23,7 +23,7 @@ def add_payment(data):
         return {"success": False, "error": "Invalid payment amount."}
     
     
-    payment_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    payment_date = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
     
     try:
         db.execute(
