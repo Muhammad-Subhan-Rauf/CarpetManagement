@@ -1,18 +1,21 @@
-# Original relative path: app/services/order_service.py
-
 # /app/services/order_service.py
 from app.database.db import get_db
 from app.services.excel_service import export_all_tables_to_excel
 import datetime
 
 def _parse_dimension(dim_val):
-    """Converts a value like 7.11 (7ft 11in) to decimal feet (7.9166...)."""
-    if not dim_val or float(dim_val) == 0:
+    """MODIFIED: Converts a value like 7.05 (7ft 5in) or 7.5 (also 7ft 5in) to decimal feet."""
+    if not dim_val:
         return 0.0
     try:
-        dim_float = float(dim_val)
-        feet = int(dim_float)
-        inches = round((dim_float - feet) * 100)
+        dim_str = str(dim_val)
+        if '.' in dim_str:
+            parts = dim_str.split('.')
+            feet = int(parts[0]) if parts[0] else 0
+            inches = int(parts[1]) if parts[1] else 0
+        else:
+            feet = int(dim_str)
+            inches = 0
         return feet + (inches / 12.0)
     except (ValueError, TypeError):
         return 0.0
@@ -330,6 +333,43 @@ def reassign_order(order_id, new_contractor_id, reason):
                 (order_id, stock_id, 'Issued', weight, price, f"Reassigned from contractor {old_contractor_id}")
             )
         
+        db.commit()
+        return {"success": True}
+    except (ValueError, db.Error) as e:
+        db.rollback()
+        return {"success": False, "error": str(e)}
+
+def issue_stock_to_order(order_id, stock_id, weight_kg):
+    """
+    Adds a new 'Issued' transaction to an existing, open order.
+    """
+    db = get_db()
+    try:
+        db.execute("BEGIN")
+        weight_kg = float(weight_kg)
+        if weight_kg <= 0:
+            raise ValueError("Weight must be a positive number.")
+
+        # 1. Verify the order is open
+        order = db.execute("SELECT Status FROM Orders WHERE OrderID = ?", (order_id,)).fetchone()
+        if not order or order['Status'] != 'Open':
+            raise ValueError("Stock can only be issued to an open order.")
+
+        # 2. Check stock availability
+        stock_item = db.execute("SELECT * FROM StockItems WHERE StockID = ?", (stock_id,)).fetchone()
+        if not stock_item:
+            raise ValueError(f"Stock item ID {stock_id} not found.")
+        if stock_item['QuantityInStockKg'] < weight_kg:
+            raise ValueError(f"Not enough stock for {stock_item['Type']} ({stock_item['Quality']}). Available: {stock_item['QuantityInStockKg']}kg")
+
+        # 3. Update inventory
+        db.execute("UPDATE StockItems SET QuantityInStockKg = QuantityInStockKg - ? WHERE StockID = ?", (weight_kg, stock_id))
+
+        # 4. Create the new transaction
+        db.execute(
+            "INSERT INTO StockTransactions (OrderID, StockID, TransactionType, WeightKg, PricePerKgAtTimeOfTransaction, Notes) VALUES (?, ?, 'Issued', ?, ?, ?)",
+            (order_id, stock_id, weight_kg, stock_item['CurrentPricePerKg'], 'Additional stock issued')
+        )
         db.commit()
         return {"success": True}
     except (ValueError, db.Error) as e:

@@ -1,7 +1,12 @@
 // src/pages/OrderDetails.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getOrderById, getOrderFinancials, getOrderTransactions, getOrderPayments, addPaymentToOrder, returnStockForOrder, getContractors, reassignOrder } from '../services/api';
+import { 
+    getOrderById, getOrderFinancials, getOrderTransactions, getOrderPayments, 
+    addPaymentToOrder, getContractors, reassignOrder,
+    // ADDED: New API calls for issuing stock
+    getStockItems, issueStockToOrder
+} from '../services/api';
 import Card from '../components/Card';
 import Modal from '../components/Modal';
 
@@ -17,6 +22,11 @@ const OrderDetails = () => {
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentNotes, setPaymentNotes] = useState('');
+
+    // ADDED: State for the "Issue More Stock" modal
+    const [isIssueStockModalOpen, setIsIssueStockModalOpen] = useState(false);
+    const [availableStock, setAvailableStock] = useState([]);
+    const [stockToAdd, setStockToAdd] = useState({ stock_id: '', weight: '' });
 
     const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
     const [reassignData, setReassignData] = useState({ new_contractor_id: '', reason: '' });
@@ -71,6 +81,38 @@ const OrderDetails = () => {
         }
     };
 
+    // ADDED: Handler to open the issue stock modal and fetch available stock
+    const openIssueStockModal = async () => {
+        if (order?.Quality) {
+            try {
+                const stock = await getStockItems(order.Quality);
+                setAvailableStock(stock);
+                setIsIssueStockModalOpen(true);
+            } catch (err) {
+                alert(`Error fetching stock: ${err.message}`);
+            }
+        } else {
+            alert("Cannot issue stock: Order quality is not defined.");
+        }
+    };
+
+    // ADDED: Handler to submit the new stock to the order
+    const handleIssueStock = async (e) => {
+        e.preventDefault();
+        if (!stockToAdd.stock_id || !stockToAdd.weight || parseFloat(stockToAdd.weight) <= 0) {
+            return alert("Please select a stock item and enter a valid, positive weight.");
+        }
+        try {
+            await issueStockToOrder(orderId, stockToAdd);
+            alert("Stock issued successfully!");
+            setIsIssueStockModalOpen(false);
+            setStockToAdd({ stock_id: '', weight: '' });
+            fetchData(); // Refresh the page data to show new transaction
+        } catch (err) {
+            alert(`Error issuing stock: ${err.message}`);
+        }
+    };
+
     if (loading) return <div>Loading details...</div>;
     if (error) return <div style={{ color: 'red' }}>Error: {error}</div>;
     if (!order || !financials) return <h2>Order not found.</h2>;
@@ -81,6 +123,7 @@ const OrderDetails = () => {
                 <Link to="/" className="back-link">← Back to Dashboard</Link>
                 <div>
                     {order.Status === 'Open' && (<button className="button-secondary" onClick={() => setIsReassignModalOpen(true)}>Change Contractor</button>)}
+                    {order.Status === 'Open' && (<button className="button-secondary" style={{marginLeft: '10px'}} onClick={openIssueStockModal}>Issue More Stock</button>)}
                     {order.Status === 'Open' && (<Link to={`/order/${orderId}/complete`} className="button">Complete Order</Link>)}
                 </div>
             </div>
@@ -106,13 +149,28 @@ const OrderDetails = () => {
                      {payments.length > 0 ? (<table className="styled-table-small"><thead><tr><th>Date</th><th>Amount</th><th>Notes</th></tr></thead><tbody>{payments.map(p=><tr key={p.PaymentID}><td>{p.PaymentDate}</td><td>{p.Amount.toFixed(2)}</td><td>{p.Notes || '-'}</td></tr>)}</tbody></table>) : <p>No payments recorded.</p>}
                 </Card>
                 <Card title="Stock Issued">
-                    <table className="styled-table-small"><thead><tr><th>Desc.</th><th>Weight</th><th>Value</th></tr></thead><tbody>
-                        {issuedTransactions.map(t=><tr key={t.TransactionID}><td>{t.Type} ({t.Quality}) {t.ColorShadeNumber && `- ${t.ColorShadeNumber}`}</td><td>{t.WeightKg.toFixed(3)}kg</td><td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td></tr>)}
-                    </tbody></table>
+                    <table className="styled-table-small">
+                        {/* ADDED: Date column */}
+                        <thead><tr><th>Date</th><th>Desc.</th><th>Weight</th><th>Value</th></tr></thead>
+                        <tbody>
+                            {issuedTransactions.map(t=><tr key={t.TransactionID}>
+                                <td>{new Date(t.TransactionDate).toLocaleDateString()}</td>
+                                <td>{t.Type} ({t.Quality}) {t.ColorShadeNumber && `- ${t.ColorShadeNumber}`}</td>
+                                <td>{t.WeightKg.toFixed(3)}kg</td>
+                                <td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td>
+                            </tr>)}
+                        </tbody>
+                    </table>
                 </Card>
                 <Card title="Stock Returned">
-                     {returnedTransactions.length > 0 ? (<table className="styled-table-small"><thead><tr><th>Desc.</th><th>Weight</th><th>Value</th><th>Notes</th></tr></thead><tbody>
-                        {returnedTransactions.map(t=><tr key={t.TransactionID}><td>{t.Type} ({t.Quality}) {t.ColorShadeNumber && `- ${t.ColorShadeNumber}`}</td><td>{t.WeightKg.toFixed(3)}kg</td><td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td><td>{t.Notes}</td></tr>)}
+                     {returnedTransactions.length > 0 ? (<table className="styled-table-small">
+                        {/* ADDED: Date column */}
+                        <thead><tr><th>Date</th><th>Desc.</th><th>Weight</th><th>Value</th><th>Notes</th></tr></thead>
+                        <tbody>
+                        {returnedTransactions.map(t=><tr key={t.TransactionID}>
+                            <td>{new Date(t.TransactionDate).toLocaleDateString()}</td>
+                            <td>{t.Type} ({t.Quality}) {t.ColorShadeNumber && `- ${t.ColorShadeNumber}`}</td>
+                            <td>{t.WeightKg.toFixed(3)}kg</td><td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td><td>{t.Notes}</td></tr>)}
                     </tbody></table>) : <p>No stock returned yet.</p>}
                 </Card>
             </div>
@@ -141,6 +199,35 @@ const OrderDetails = () => {
                     <div className="modal-footer">
                         <button type="button" className="button-secondary" onClick={() => setIsReassignModalOpen(false)}>Cancel</button>
                         <button type="submit" className="button">Confirm Reassignment</button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* ADDED: Modal for issuing more stock */}
+            <Modal isOpen={isIssueStockModalOpen} onClose={() => setIsIssueStockModalOpen(false)} title="Issue More Stock to Order">
+                <form onSubmit={handleIssueStock}>
+                    <div className="form-group">
+                        <label>Stock Item</label>
+                        <select 
+                            value={stockToAdd.stock_id} 
+                            onChange={e => setStockToAdd(p => ({...p, stock_id: e.target.value}))}
+                            required
+                        >
+                            <option value="" disabled>-- Select Available Stock --</option>
+                            {availableStock.map(s => (
+                                <option key={s.StockID} value={s.StockID} disabled={s.QuantityInStockKg <= 0}>
+                                    {s.Type} ({s.Quality}) {s.ColorShadeNumber && `- ${s.ColorShadeNumber}`} - {s.QuantityInStockKg.toFixed(3)}kg available
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="form-group">
+                        <label>Weight to Issue (kg)</label>
+                        <input type="number" step="0.001" value={stockToAdd.weight} onChange={e => setStockToAdd(p => ({...p, weight: e.target.value}))} required />
+                    </div>
+                    <div className="modal-footer">
+                        <button type="button" className="button-secondary" onClick={() => setIsIssueStockModalOpen(false)}>Cancel</button>
+                        <button type="submit" className="button">Issue Stock</button>
                     </div>
                 </form>
             </Modal>

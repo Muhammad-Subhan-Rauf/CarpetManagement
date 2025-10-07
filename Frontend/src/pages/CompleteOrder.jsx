@@ -1,7 +1,3 @@
-// Original relative path: pages/CompleteOrder.jsx
-
-// Original relative path: src/pages/CompleteOrder.jsx
-
 // src/pages/CompleteOrder.jsx
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -28,15 +24,17 @@ const CompleteOrder = () => {
   const [newDeduction, setNewDeduction] = useState({ reason: '', amount: '' });
   const [reconciliation, setReconciliation] = useState({});
 
+  // MODIFIED: Area calculation logic as per user request
   const _parseDimension = useCallback((dimVal) => {
-    if (!dimVal || parseFloat(dimVal) === 0) return 0.0;
+    if (!dimVal) return 0.0;
     try {
-        const dimFloat = parseFloat(dimVal);
-        const feet = Math.trunc(dimFloat);
-        const inches = Math.round((dimFloat - feet) * 100);
-        return feet + (inches / 12.0);
+      const dimStr = String(dimVal);
+      const parts = dimStr.split('.');
+      const feet = parseInt(parts[0], 10) || 0;
+      const inches = parts.length > 1 ? parseInt(parts[1], 10) || 0 : 0;
+      return feet + (inches / 12.0);
     } catch (e) {
-        return 0.0;
+      return 0.0;
     }
   }, []);
 

@@ -101,3 +101,17 @@ def handle_reassign_order(order_id):
         return jsonify({"message": "Order reassigned successfully"}), 200
     else:
         return jsonify({"error": result.get('error', 'Unknown error')}), 400
+
+# NEW: Endpoint to issue more stock to an existing open order
+@orders_bp.route('/orders/<int:order_id>/issue-stock', methods=['POST'])
+def handle_issue_stock_to_order(order_id):
+    data = request.get_json()
+    if not all(k in data for k in ['stock_id', 'weight']):
+        return jsonify({"error": "Missing 'stock_id' or 'weight'"}), 400
+    
+    result = order_service.issue_stock_to_order(order_id, data['stock_id'], data['weight'])
+    
+    if result.get('success'):
+        return jsonify({"message": "Stock issued successfully"}), 200
+    else:
+        return jsonify({"error": result.get('error', 'Unknown error')}), 400
