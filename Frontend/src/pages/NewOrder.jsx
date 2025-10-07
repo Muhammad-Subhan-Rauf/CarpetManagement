@@ -1,3 +1,5 @@
+// Original relative path: pages/NewOrder.jsx
+
 // Original relative path: src/pages/NewOrder.jsx
 
 // Original relative path: pages/NewOrder.jsx
@@ -161,7 +163,13 @@ const NewOrder = () => {
             <div className="form-group"><label>Select Stock</label>
               <select name="StockID" value={stockToAdd.StockID} onChange={handleStockFormChange}>
                 <option value="" disabled>-- Select Stock --</option>
-                {availableInventory.length > 0 ? availableInventory.map(i => <option key={i.StockID} value={i.StockID} disabled={i.QuantityInStockKg <= 0}>{i.Type} ({i.Quality}) - {i.QuantityInStockKg.toFixed(3)}kg available</option>) : <option disabled>No stock found for this quality</option>}
+                {availableInventory.length > 0 ? availableInventory.map(i => (
+                  <option key={i.StockID} value={i.StockID} disabled={i.QuantityInStockKg <= 0}>
+                    {i.Type} ({i.Quality}) {i.ColorShadeNumber && `- ${i.ColorShadeNumber}`} - {i.QuantityInStockKg.toFixed(3)}kg available
+                  </option>
+                )) : (
+                  <option disabled>No stock found for this quality</option>
+                )}
               </select>
             </div>
             <div className="form-group"><label>Weight (kg)</label><input type="number" step="0.001" name="weight" value={stockToAdd.weight} onChange={handleStockFormChange}/></div>
