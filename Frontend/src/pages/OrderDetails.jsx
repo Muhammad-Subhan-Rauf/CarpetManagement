@@ -1,14 +1,63 @@
+// Original relative path: pages/OrderDetails.jsx
+
 // src/pages/OrderDetails.jsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
     getOrderById, getOrderFinancials, getOrderTransactions, getOrderPayments, 
     addPaymentToOrder, getContractors, reassignOrder,
-    // ADDED: New API calls for issuing stock
     getStockItems, issueStockToOrder
 } from '../services/api';
 import Card from '../components/Card';
 import Modal from '../components/Modal';
+
+// --- MODIFIED: Helper component for relative timestamps now formats tooltip to PKT ---
+const RelativeTimestamp = ({ date, referenceDate }) => {
+  const getRelativeDays = (dateStr, referenceDateStr) => {
+    if (!dateStr || !referenceDateStr) return null;
+    const date = new Date(dateStr);
+    // FIXED: Corrected the constructor from new 'Date' to new Date
+    const reference = new Date(referenceDateStr);
+    
+    // Reset time to compare dates only
+    date.setHours(0, 0, 0, 0);
+    reference.setHours(0, 0, 0, 0);
+
+    const diffTime = date - reference;
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const fullTimestamp = new Date(date).toLocaleString('en-US', {
+    timeZone: 'Asia/Karachi',
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+
+  const relativeDays = getRelativeDays(date, referenceDate);
+  let displayText = fullTimestamp;
+
+  if (relativeDays !== null) {
+    if (relativeDays === 0) {
+      displayText = 'On issuance day';
+    } else if (relativeDays > 0) {
+      displayText = `${relativeDays} day${relativeDays > 1 ? 's' : ''} later`;
+    } else {
+      displayText = `${Math.abs(relativeDays)} day${Math.abs(relativeDays) > 1 ? 's' : ''} prior`;
+    }
+  }
+
+  return (
+    <span title={`PKT: ${fullTimestamp}`}>
+      {displayText}
+    </span>
+  );
+};
+
 
 const OrderDetails = () => {
     const { orderId } = useParams();
@@ -23,7 +72,6 @@ const OrderDetails = () => {
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentNotes, setPaymentNotes] = useState('');
 
-    // ADDED: State for the "Issue More Stock" modal
     const [isIssueStockModalOpen, setIsIssueStockModalOpen] = useState(false);
     const [availableStock, setAvailableStock] = useState([]);
     const [stockToAdd, setStockToAdd] = useState({ stock_id: '', weight: '' });
@@ -81,7 +129,6 @@ const OrderDetails = () => {
         }
     };
 
-    // ADDED: Handler to open the issue stock modal and fetch available stock
     const openIssueStockModal = async () => {
         if (order?.Quality) {
             try {
@@ -96,7 +143,6 @@ const OrderDetails = () => {
         }
     };
 
-    // ADDED: Handler to submit the new stock to the order
     const handleIssueStock = async (e) => {
         e.preventDefault();
         if (!stockToAdd.stock_id || !stockToAdd.weight || parseFloat(stockToAdd.weight) <= 0) {
@@ -107,7 +153,7 @@ const OrderDetails = () => {
             alert("Stock issued successfully!");
             setIsIssueStockModalOpen(false);
             setStockToAdd({ stock_id: '', weight: '' });
-            fetchData(); // Refresh the page data to show new transaction
+            fetchData(); 
         } catch (err) {
             alert(`Error issuing stock: ${err.message}`);
         }
@@ -143,18 +189,28 @@ const OrderDetails = () => {
                     <hr/><div className="financial-item total"><span>Net Billable Amount:</span> <span>Rs {(financials.OrderWage - financials.NetStockValue - financials.TotalDeductions).toFixed(2)}</span></div><hr/>
                     <div className="financial-item"><span>Total Paid:</span> <span>Rs {financials.AmountPaid.toFixed(2)}</span></div>
                     <div className="financial-item pending"><span>CURRENTLY PENDING:</span> <span>Rs {financials.AmountPending.toFixed(2)}</span></div>
-                    {financials.AmountPending > 0.01 && (<div style={{marginTop: '1.5rem'}}><button className="button" style={{width: '100%'}} onClick={() => setIsPaymentModalOpen(true)}>Make a Payment</button></div>)}
+                    
+                    {/* MODIFIED: Allow payment on any open order to enable advance payments */}
+                    {order.Status === 'Open' && (<div style={{marginTop: '1.5rem'}}><button className="button" style={{width: '100%'}} onClick={() => setIsPaymentModalOpen(true)}>Make a Payment</button></div>)}
                 </Card>
                 <Card title="Payment History">
-                     {payments.length > 0 ? (<table className="styled-table-small"><thead><tr><th>Date</th><th>Amount</th><th>Notes</th></tr></thead><tbody>{payments.map(p=><tr key={p.PaymentID}><td>{p.PaymentDate}</td><td>{p.Amount.toFixed(2)}</td><td>{p.Notes || '-'}</td></tr>)}</tbody></table>) : <p>No payments recorded.</p>}
+                     {payments.length > 0 ? (<table className="styled-table-small">
+                        {/* MODIFIED: Header changed to "Date" */}
+                        <thead><tr><th>Date</th><th>Amount</th><th>Notes</th></tr></thead>
+                        <tbody>{payments.map(p=><tr key={p.PaymentID}>
+                            {/* MODIFIED: Use RelativeTimestamp component */}
+                            <td><RelativeTimestamp date={p.PaymentDate} referenceDate={order.DateIssued} /></td>
+                            <td>{p.Amount.toFixed(2)}</td><td>{p.Notes || '-'}</td></tr>)}</tbody>
+                        </table>) : <p>No payments recorded.</p>}
                 </Card>
                 <Card title="Stock Issued">
                     <table className="styled-table-small">
-                        {/* ADDED: Date column */}
+                        {/* MODIFIED: Header changed to "Date" */}
                         <thead><tr><th>Date</th><th>Desc.</th><th>Weight</th><th>Value</th></tr></thead>
                         <tbody>
                             {issuedTransactions.map(t=><tr key={t.TransactionID}>
-                                <td>{new Date(t.TransactionDate).toLocaleDateString()}</td>
+                                {/* MODIFIED: Use RelativeTimestamp component */}
+                                <td><RelativeTimestamp date={t.TransactionDate} referenceDate={order.DateIssued} /></td>
                                 <td>{t.Type} ({t.Quality}) {t.ColorShadeNumber && `- ${t.ColorShadeNumber}`}</td>
                                 <td>{t.WeightKg.toFixed(3)}kg</td>
                                 <td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td>
@@ -164,11 +220,12 @@ const OrderDetails = () => {
                 </Card>
                 <Card title="Stock Returned">
                      {returnedTransactions.length > 0 ? (<table className="styled-table-small">
-                        {/* ADDED: Date column */}
+                        {/* MODIFIED: Header changed to "Date" */}
                         <thead><tr><th>Date</th><th>Desc.</th><th>Weight</th><th>Value</th><th>Notes</th></tr></thead>
                         <tbody>
                         {returnedTransactions.map(t=><tr key={t.TransactionID}>
-                            <td>{new Date(t.TransactionDate).toLocaleDateString()}</td>
+                            {/* MODIFIED: Use RelativeTimestamp component */}
+                            <td><RelativeTimestamp date={t.TransactionDate} referenceDate={order.DateIssued} /></td>
                             <td>{t.Type} ({t.Quality}) {t.ColorShadeNumber && `- ${t.ColorShadeNumber}`}</td>
                             <td>{t.WeightKg.toFixed(3)}kg</td><td>Rs {(t.WeightKg * t.PricePerKgAtTimeOfTransaction).toFixed(2)}</td><td>{t.Notes}</td></tr>)}
                     </tbody></table>) : <p>No stock returned yet.</p>}
@@ -203,7 +260,6 @@ const OrderDetails = () => {
                 </form>
             </Modal>
 
-            {/* ADDED: Modal for issuing more stock */}
             <Modal isOpen={isIssueStockModalOpen} onClose={() => setIsIssueStockModalOpen(false)} title="Issue More Stock to Order">
                 <form onSubmit={handleIssueStock}>
                     <div className="form-group">

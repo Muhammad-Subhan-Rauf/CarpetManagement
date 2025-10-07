@@ -1,8 +1,25 @@
+// Original relative path: pages/ContractorDetails.jsx
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getContractorDetails, addGeneralPayment } from '../services/api';
 import Card from '../components/Card';
 import Modal from '../components/Modal';
+
+// --- ADDED: Helper function to format dates to PKT ---
+const formatToPkt = (dateString) => {
+  if (!dateString) return 'N/A';
+  return new Date(dateString).toLocaleString('en-US', {
+    timeZone: 'Asia/Karachi',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
 
 const ContractorDetails = () => {
     const { contractorId } = useParams();
@@ -146,14 +163,21 @@ const ContractorDetails = () => {
                     <button className={`tab ${activeTab === 'transactions' ? 'active' : ''}`} onClick={() => setActiveTab('transactions')}>Stock Ledger</button>
                 </div>
                 {activeTab === 'orders' && (<table className="styled-table"><thead><tr><th>Design #</th><th>Quality</th><th>Wage</th><th>Status</th><th>Action</th></tr></thead><tbody>{orders.map(o => (<tr key={o.OrderID}><td>{o.DesignNumber}</td><td>{o.Quality}</td><td>Rs {o.Wage?.toFixed(2) || '0.00'}</td><td><span className={`status-badge status-${o.Status}`}>{o.Status}</span></td><td><Link to={`/order/${o.OrderID}`} className="button-small">View</Link></td></tr>))}</tbody></table>)}
-                {activeTab === 'payments' && ( <table className="styled-table"><thead><tr><th>Date</th><th>Amount (Rs)</th><th>Notes</th><th>Order ID</th></tr></thead><tbody>{payments.map(p => <tr key={p.PaymentID}><td>{p.PaymentDate}</td><td>{p.Amount.toFixed(2)}</td><td>{p.Notes || '-'}</td><td>{p.OrderID || 'General'}</td></tr>)}</tbody></table>)}
+                {activeTab === 'payments' && ( <table className="styled-table"><thead><tr>
+                    {/* MODIFIED: Changed header to "Date & Time (PKT)" */}
+                    <th>Date & Time (PKT)</th>
+                    <th>Amount (Rs)</th><th>Notes</th><th>Order ID</th></tr></thead><tbody>{payments.map(p => <tr key={p.PaymentID}>
+                        {/* MODIFIED: Format the date string to PKT */}
+                        <td>{formatToPkt(p.PaymentDate)}</td>
+                        <td>{p.Amount.toFixed(2)}</td><td>{p.Notes || '-'}</td><td>{p.OrderID || 'General'}</td></tr>)}</tbody></table>)}
                 {activeTab === 'transactions' && (
                     <table className="styled-table">
-                        {/* ADDED: TransactionDate column */}
-                        <thead><tr><th>Date</th><th>Order ID</th><th>Type</th><th>Description</th><th>Weight</th><th>Value</th><th>Notes</th></tr></thead>
+                        {/* MODIFIED: Changed header to "Date & Time (PKT)" */}
+                        <thead><tr><th>Date & Time (PKT)</th><th>Order ID</th><th>Type</th><th>Description</th><th>Weight</th><th>Value</th><th>Notes</th></tr></thead>
                         <tbody>{transactions.map(t => (
                             <tr key={t.TransactionID}>
-                                <td>{new Date(t.TransactionDate).toLocaleDateString()}</td>
+                                {/* MODIFIED: Format the date string to PKT */}
+                                <td>{formatToPkt(t.TransactionDate)}</td>
                                 <td>{t.OrderID}</td>
                                 <td><span className={`status-badge status-${t.TransactionType}`}>{t.TransactionType}</span></td>
                                 <td>{t.Type} ({t.StockQuality}) {t.ColorShadeNumber && `- ${t.ColorShadeNumber}`}</td>

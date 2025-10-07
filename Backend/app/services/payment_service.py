@@ -22,7 +22,8 @@ def add_payment(data):
     if not isinstance(amount, (int, float)):
         return {"success": False, "error": "Invalid payment amount."}
     
-    payment_date = datetime.date.today().isoformat()
+    
+    payment_date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     try:
         db.execute(
