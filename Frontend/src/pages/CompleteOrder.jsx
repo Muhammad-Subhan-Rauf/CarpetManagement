@@ -1,4 +1,4 @@
-// src/pages/CompleteOrder.jsx
+// Original relative path: Frontend/src/pages/CompleteOrder.jsx
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
@@ -18,25 +18,29 @@ const CompleteOrder = () => {
   // Form state
   const [completionDate, setCompletionDate] = useState(new Date().toISOString().split('T')[0]);
   const [finalWage, setFinalWage] = useState('');
-  const [finalDimensions, setFinalDimensions] = useState({ length: '', width: '' });
+  
+  // --- MODIFIED: Split state for final dimensions ---
+  const [finalDimensions, setFinalDimensions] = useState({ 
+      lengthFt: '', lengthIn: '', 
+      widthFt: '', widthIn: '' 
+  });
+  
   const [pricePerSqFt, setPricePerSqFt] = useState('');
   const [deductions, setDeductions] = useState([]);
   const [newDeduction, setNewDeduction] = useState({ reason: '', amount: '' });
   const [reconciliation, setReconciliation] = useState({});
 
-  // MODIFIED: Area calculation logic as per user request
-  const _parseDimension = useCallback((dimVal) => {
-    if (!dimVal) return 0.0;
-    try {
-      const dimStr = String(dimVal);
-      const parts = dimStr.split('.');
-      const feet = parseInt(parts[0], 10) || 0;
-      const inches = parts.length > 1 ? parseInt(parts[1], 10) || 0 : 0;
-      return feet + (inches / 12.0);
-    } catch (e) {
-      return 0.0;
-    }
-  }, []);
+  // Helper: Convert decimal feet to feet and inches
+  const decimalToFtIn = (decimalVal) => {
+      if (!decimalVal) return { ft: '', in: '' };
+      let feet = Math.floor(decimalVal);
+      let inches = Math.round((decimalVal - feet) * 12);
+      if (inches === 12) {
+          feet += 1;
+          inches = 0;
+      }
+      return { ft: feet, in: inches };
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -51,8 +55,15 @@ const CompleteOrder = () => {
       const initialWage = orderData.Wage || (orderData.Length * orderData.Width * orderData.PricePerSqFt) || 0;
       setFinalWage(initialWage.toFixed(2));
 
-      // Pre-fill final dimensions with the order's original dimensions
-      setFinalDimensions({ length: orderData.Length || '', width: orderData.Width || '' });
+      // --- MODIFIED: Pre-fill dimensions by converting decimal back to ft/in ---
+      const l = decimalToFtIn(orderData.Length);
+      const w = decimalToFtIn(orderData.Width);
+      
+      setFinalDimensions({ 
+          lengthFt: l.ft, lengthIn: l.in,
+          widthFt: w.ft, widthIn: w.in 
+      });
+
       setPricePerSqFt(orderData.PricePerSqFt || '');
 
       const initialRecon = {};
@@ -70,27 +81,39 @@ const CompleteOrder = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Auto-calculate wage when dimensions or price changes
+  // --- MODIFIED: Auto-calculate wage using the separate inputs ---
   useEffect(() => {
-    const length = _parseDimension(finalDimensions.length);
-    const width = _parseDimension(finalDimensions.width);
+    const lFt = parseFloat(finalDimensions.lengthFt) || 0;
+    const lIn = parseFloat(finalDimensions.lengthIn) || 0;
+    const wFt = parseFloat(finalDimensions.widthFt) || 0;
+    const wIn = parseFloat(finalDimensions.widthIn) || 0;
     const ppsqft = parseFloat(pricePerSqFt) || 0;
 
-    if (length > 0 && width > 0 && ppsqft > 0) {
-        const calculatedWage = length * width * ppsqft;
+    // decimal = ft + in/12
+    const lDecimal = lFt + (lIn / 12);
+    const wDecimal = wFt + (wIn / 12);
+
+    if (lDecimal > 0 && wDecimal > 0 && ppsqft > 0) {
+        const calculatedWage = lDecimal * wDecimal * ppsqft;
         setFinalWage(calculatedWage.toFixed(2));
     }
-  }, [finalDimensions.length, finalDimensions.width, pricePerSqFt, _parseDimension]);
+  }, [finalDimensions, pricePerSqFt]);
 
-  // NEW: Memoized calculation for the final area
+  // --- MODIFIED: Memoized final area calculation ---
   const finalArea = useMemo(() => {
-    const length = _parseDimension(finalDimensions.length);
-    const width = _parseDimension(finalDimensions.width);
-    if (length > 0 && width > 0) {
-        return (length * width).toFixed(2);
+    const lFt = parseFloat(finalDimensions.lengthFt) || 0;
+    const lIn = parseFloat(finalDimensions.lengthIn) || 0;
+    const wFt = parseFloat(finalDimensions.widthFt) || 0;
+    const wIn = parseFloat(finalDimensions.widthIn) || 0;
+    
+    const lDecimal = lFt + (lIn / 12);
+    const wDecimal = wFt + (wIn / 12);
+    
+    if (lDecimal > 0 && wDecimal > 0) {
+        return (lDecimal * wDecimal).toFixed(2);
     }
     return '0.00';
-  }, [finalDimensions.length, finalDimensions.width, _parseDimension]);
+  }, [finalDimensions]);
   
   const outstandingStock = useMemo(() => {
     const stockMap = new Map();
@@ -129,6 +152,12 @@ const CompleteOrder = () => {
     return { reconciledStockValue, totalDeductions, wage, netStockValue, pendingAmount };
   }, [finalWage, reconciliation, deductions, order, financials]);
 
+  // --- MODIFIED: Update handler for dimension inputs ---
+  const handleDimChange = (e) => {
+      const { name, value } = e.target;
+      setFinalDimensions(prev => ({ ...prev, [name]: value }));
+  };
+
   const handleConfirmCompletion = async () => {
     // Validation
     for (const stock of outstandingStock) {
@@ -141,11 +170,15 @@ const CompleteOrder = () => {
         }
     }
 
+    // --- MODIFIED: Construct Feet.Inches strings for the backend ---
+    const finalLengthStr = `${finalDimensions.lengthFt || '0'}.${finalDimensions.lengthIn || '0'}`;
+    const finalWidthStr = `${finalDimensions.widthFt || '0'}.${finalDimensions.widthIn || '0'}`;
+
     const payload = {
       dateCompleted: completionDate,
       finalWage: parseFloat(finalWage) || 0,
-      finalLength: finalDimensions.length,
-      finalWidth: finalDimensions.width,
+      finalLength: finalLengthStr,
+      finalWidth: finalWidthStr,
       pricePerSqFt: parseFloat(pricePerSqFt) || 0,
       reconciliation: Object.values(reconciliation).map(s => ({ 
         StockID: s.StockID, 
@@ -176,21 +209,24 @@ const CompleteOrder = () => {
             <div className="form-group"><label>Carpet Delivery Date</label><input type="date" value={completionDate} onChange={(e) => setCompletionDate(e.target.value)} /></div>
             
             <div className="form-grid-2">
+               {/* --- MODIFIED: Split Inputs for Final Length --- */}
               <div className="form-group">
                 <label>Final Length</label>
-                <input type="number" step="0.01" value={finalDimensions.length} 
-                       onChange={e => setFinalDimensions(p => ({...p, length: e.target.value}))} 
-                       placeholder="e.g., 7.11 for 7ft 11in" />
+                <div style={{display: 'flex', gap: '5px'}}>
+                    <input type="number" placeholder="Ft" name="lengthFt" value={finalDimensions.lengthFt} onChange={handleDimChange} style={{flex: 1}} />
+                    <input type="number" placeholder="In" name="lengthIn" value={finalDimensions.lengthIn} onChange={handleDimChange} style={{flex: 1}} />
+                </div>
               </div>
+               {/* --- MODIFIED: Split Inputs for Final Width --- */}
               <div className="form-group">
                 <label>Final Width</label>
-                <input type="number" step="0.01" value={finalDimensions.width} 
-                       onChange={e => setFinalDimensions(p => ({...p, width: e.target.value}))} 
-                       placeholder="e.g., 8.02 for 8ft 2in" />
+                <div style={{display: 'flex', gap: '5px'}}>
+                    <input type="number" placeholder="Ft" name="widthFt" value={finalDimensions.widthFt} onChange={handleDimChange} style={{flex: 1}} />
+                    <input type="number" placeholder="In" name="widthIn" value={finalDimensions.widthIn} onChange={handleDimChange} style={{flex: 1}} />
+                </div>
               </div>
             </div>
 
-            {/* ADDED: Display for final calculated area */}
             <div className="form-group">
                 <label>Final Area (Sq. Ft.)</label>
                 <input type="text" value={`${finalArea} sq. ft.`} disabled />
@@ -230,7 +266,6 @@ const CompleteOrder = () => {
               <div className="financial-item total"><span>Final Wage Payable:</span> <span>Rs {financialSummary.wage?.toFixed(2)}</span></div>
               <div className="financial-item negative"><span>(-) Net Stock Value:</span> <span>Rs {financialSummary.netStockValue?.toFixed(2)}</span></div>
               
-              {/* Display added deductions */}
               {deductions.length > 0 && deductions.map((d, i) => (
                   <div key={i} className="financial-item negative small-text">
                       <span>(-) {d.reason}</span>
