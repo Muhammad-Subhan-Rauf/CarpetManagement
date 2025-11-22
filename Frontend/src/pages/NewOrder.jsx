@@ -14,16 +14,12 @@ const NewOrder = () => {
   const [availableInventory, setAvailableInventory] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Search state for Step 2
+  const [stockSearch, setStockSearch] = useState({ type: '', quality: '', color: '' });
+
   const [isContractorModalOpen, setIsContractorModalOpen] = useState(false);
   const [newContractor, setNewContractor] = useState({ Name: '', ContactInfo: '' });
-
-  // --- ADDED: Separate state for split dimension inputs ---
-  const [dimensions, setDimensions] = useState({
-      lengthFt: '',
-      lengthIn: '',
-      widthFt: '',
-      widthIn: ''
-  });
+  const [dimensions, setDimensions] = useState({ lengthFt: '', lengthIn: '', widthFt: '', widthIn: '' });
 
   const fetchInitialData = useCallback(async () => {
     try {
@@ -37,16 +33,13 @@ const NewOrder = () => {
     }
   }, []);
   
-  const fetchStockForQuality = useCallback(async (quality) => {
-    if (!quality) {
-        setAvailableInventory([]);
-        return;
-    }
+  // Generic Fetch Function
+  const fetchStock = useCallback(async (params = {}) => {
     try {
-        const inventoryData = await getStockItems({ quality });
+        const inventoryData = await getStockItems(params);
         setAvailableInventory(inventoryData);
     } catch (error) {
-        alert(`Failed to load stock for quality ${quality}: ${error.message}`);
+        alert(`Failed to load stock: ${error.message}`);
         setAvailableInventory([]);
     }
   }, []);
@@ -68,29 +61,21 @@ const NewOrder = () => {
   const handleOrderDataChange = (e) => {
     const { name, value } = e.target;
     setOrderData(prev => ({ ...prev, [name]: value }));
-    if (name === 'Quality') {
-        fetchStockForQuality(value);
-    }
   };
   
-  // --- ADDED: Handler for dimension changes ---
   const handleDimensionChange = (e) => {
       const { name, value } = e.target;
       setDimensions(prev => ({ ...prev, [name]: value }));
   };
   
-  // --- ADDED: Calculate Wage live based on separate feet/inch inputs ---
   const calculatedWage = useMemo(() => {
       const lFt = parseFloat(dimensions.lengthFt) || 0;
       const lIn = parseFloat(dimensions.lengthIn) || 0;
       const wFt = parseFloat(dimensions.widthFt) || 0;
       const wIn = parseFloat(dimensions.widthIn) || 0;
       const price = parseFloat(orderData.PricePerSqFt) || 0;
-
-      // Decimal feet = Feet + (Inches / 12)
       const decimalLength = lFt + (lIn / 12);
       const decimalWidth = wFt + (wIn / 12);
-      
       return (decimalLength * decimalWidth * price).toFixed(2);
   }, [dimensions, orderData.PricePerSqFt]);
 
@@ -114,10 +99,8 @@ const NewOrder = () => {
     const stockItem = availableInventory.find(i => i.StockID === parseInt(stockToAdd.StockID));
     const weight = parseFloat(stockToAdd.weight);
     if (!stockItem || !weight || weight <= 0) return alert('Invalid stock or weight.');
-
     const alreadyIssued = issuedStock.filter(s => s.StockID === stockItem.StockID).reduce((sum, s) => sum + s.WeightKg, 0);
     if (weight + alreadyIssued > stockItem.QuantityInStockKg) return alert(`Not enough stock. Available: ${(stockItem.QuantityInStockKg - alreadyIssued).toFixed(3)}kg`);
-    
     setIssuedStock(prev => [...prev, { ...stockItem, WeightKg: weight, TransactionDate: stockToAdd.date }]);
     setStockToAdd({ StockID: '', weight: '', date: new Date().toISOString().split('T')[0] });
   };
@@ -125,7 +108,6 @@ const NewOrder = () => {
   const removeStockItem = (index) => setIssuedStock(prev => prev.filter((_, i) => i !== index));
 
   const handleCreateOrder = async () => {
-    // --- MODIFIED: Construct the "Feet.Inches" strings and Size string ---
     const lengthStr = `${dimensions.lengthFt || '0'}.${dimensions.lengthIn || '0'}`;
     const widthStr = `${dimensions.widthFt || '0'}.${dimensions.widthIn || '0'}`;
     const sizeStr = `${dimensions.widthFt || 0}'${dimensions.widthIn || 0}" x ${dimensions.lengthFt || 0}'${dimensions.lengthIn || 0}"`;
@@ -151,6 +133,27 @@ const NewOrder = () => {
     }
   };
 
+  // --- FILTER LOGIC ---
+  const handleStockSearch = (e) => {
+    if(e) e.preventDefault();
+    const params = {};
+    if (stockSearch.type) params.search_type = stockSearch.type;
+    if (stockSearch.quality) params.search_quality = stockSearch.quality;
+    if (stockSearch.color) params.search_color = stockSearch.color;
+    fetchStock(params);
+  };
+
+  // Manual transition to Step 2
+  const goToStep2 = () => {
+      setStep(2);
+      // Pre-fill quality filter with order quality, but allow editing
+      const initialQuality = orderData.Quality;
+      setStockSearch(p => ({ ...p, quality: initialQuality, type: '', color: '' }));
+      // Fetch initial list
+      fetchStock({ search_quality: initialQuality });
+  };
+
+
   if (loading) return <div>Loading form data...</div>;
 
   return (
@@ -171,7 +174,6 @@ const NewOrder = () => {
           <hr/>
           <h4>Wage Calculation (Dimensions)</h4>
           <div className="form-grid-3">
-            {/* --- MODIFIED: Split inputs for Length --- */}
             <div className="form-group">
                 <label>Length</label>
                 <div style={{display: 'flex', gap: '5px'}}>
@@ -179,7 +181,6 @@ const NewOrder = () => {
                     <input type="number" placeholder="In" name="lengthIn" value={dimensions.lengthIn} onChange={handleDimensionChange} style={{flex: 1}} />
                 </div>
             </div>
-             {/* --- MODIFIED: Split inputs for Width --- */}
             <div className="form-group">
                 <label>Width</label>
                 <div style={{display: 'flex', gap: '5px'}}>
@@ -195,12 +196,23 @@ const NewOrder = () => {
             <div className="form-group"><label>Date Issued</label><input type="date" name="DateIssued" value={orderData.DateIssued} onChange={handleOrderDataChange}/></div>
             <div className="form-group"><label>Date Due</label><input type="date" name="DateDue" value={orderData.DateDue} onChange={handleOrderDataChange}/></div>
           </div>
-          <div className="step-navigation"><button className="button" onClick={() => setStep(2)} disabled={!orderData.ContractorID || !orderData.DesignNumber || !orderData.Quality}>Next: Issue Stock</button></div>
+          <div className="step-navigation"><button className="button" onClick={goToStep2} disabled={!orderData.ContractorID || !orderData.DesignNumber || !orderData.Quality}>Next: Issue Stock</button></div>
         </Card>
       )}
 
       {step === 2 && (
-        <Card title={`Step 2: Issue Stock (Quality: ${orderData.Quality})`}>
+        <Card title={`Step 2: Issue Stock`}>
+            {/* SEARCH SECTION */}
+            <div style={{ marginBottom: '15px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+                <h4>Filter Inventory</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px', marginBottom: '5px' }}>
+                    <input type="text" placeholder="Type (e.g. Wool)" value={stockSearch.type} onChange={e => setStockSearch(p => ({...p, type: e.target.value}))} />
+                    <input type="text" placeholder="Quality (e.g. 60x60)" value={stockSearch.quality} onChange={e => setStockSearch(p => ({...p, quality: e.target.value}))} />
+                    <input type="text" placeholder="Color/Shade" value={stockSearch.color} onChange={e => setStockSearch(p => ({...p, color: e.target.value}))} />
+                </div>
+                <button type="button" className="button-small" onClick={handleStockSearch}>Apply Filter</button>
+            </div>
+
           <div className="stock-issue-form form-grid-3">
             <div className="form-group"><label>Select Stock</label>
               <select name="StockID" value={stockToAdd.StockID} onChange={handleStockFormChange}>
@@ -210,7 +222,7 @@ const NewOrder = () => {
                     {i.Type} ({i.Quality}) {i.ColorShadeNumber && `- ${i.ColorShadeNumber}`} - {i.QuantityInStockKg.toFixed(3)}kg available
                   </option>
                 )) : (
-                  <option disabled>No stock found for this quality</option>
+                  <option disabled>No stock found matching filters</option>
                 )}
               </select>
             </div>
@@ -221,7 +233,7 @@ const NewOrder = () => {
               <button type="button" className="button" onClick={handleAddStockToOrder}>Add Stock to Order</button>
             </div>
           </div><hr/>
-
+          
           <h3>Stock to be Issued</h3>
           {issuedStock.length > 0 ? (<table className="styled-table"><thead><tr><th>Date</th><th>Desc.</th><th>Weight</th><th>Action</th></tr></thead><tbody>{issuedStock.map((s,i)=>(<tr key={i}><td>{s.TransactionDate}</td><td>{s.Type} ({s.Quality}) {s.ColorShadeNumber && `- ${s.ColorShadeNumber}`}</td><td>{s.WeightKg.toFixed(3)}kg</td><td><button onClick={()=>removeStockItem(i)} className="button-icon-danger"><FaTrash/></button></td></tr>))}</tbody></table>) : <p>No stock added yet.</p>}
           <div className="step-navigation"><button className="button-secondary" onClick={()=>setStep(1)}>Back</button><button className="button" onClick={()=>setStep(3)} disabled={issuedStock.length===0}>Next: Review</button></div>

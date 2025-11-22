@@ -2,30 +2,27 @@ import sqlite3
 from app.database.db import get_db
 from app.services.excel_service import export_all_tables_to_excel
 
-def get_all_stock_items(quality=None, quality_search=None, color_search=None):
+def get_all_stock_items(search_type=None, search_quality=None, search_color=None):
     """
-    Fetches stock items.
-    - `quality`: Fetches stock for a new order of a specific quality (includes generic types).
-    - `quality_search`, `color_search`: Filters the main inventory list.
+    Fetches stock items with flexible search filters.
     """
     db = get_db()
     query = "SELECT * FROM StockItems"
     params = []
     conditions = []
     
-    # Logic for fetching stock for a NEW ORDER page
-    if quality:
-        conditions.append("(Quality = ? OR Type IN ('Tani', 'Butka'))")
-        params.append(quality)
+    # --- FIX: Generic Search Logic using LIKE ---
+    if search_type:
+        conditions.append("Type LIKE ?")
+        params.append(f"%{search_type}%")
 
-    # Logic for SEARCHING the main inventory page
-    if quality_search:
+    if search_quality:
         conditions.append("Quality LIKE ?")
-        params.append(f"%{quality_search}%")
-    if color_search:
-        # Handle cases where ColorShadeNumber might be NULL
+        params.append(f"%{search_quality}%")
+
+    if search_color:
         conditions.append("IFNULL(ColorShadeNumber, '') LIKE ?")
-        params.append(f"%{color_search}%")
+        params.append(f"%{search_color}%")
 
     if conditions:
         query += " WHERE " + " AND ".join(conditions)

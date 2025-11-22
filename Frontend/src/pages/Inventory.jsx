@@ -1,8 +1,4 @@
-// Original relative path: pages/Inventory.jsx
-
-// src/pages/Inventory.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-// MODIFIED: getStockItems no longer used directly, api object is used
 import { getStockItems, addStockItem, updateStockItem } from '../services/api';
 import Card from '../components/Card';
 import Modal from '../components/Modal';
@@ -12,7 +8,8 @@ const Inventory = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // ADDED: State for search terms
+  // ADDED: State for stock type search
+  const [typeSearch, setTypeSearch] = useState('');
   const [qualitySearch, setQualitySearch] = useState('');
   const [colorSearch, setColorSearch] = useState('');
 
@@ -23,7 +20,6 @@ const Inventory = () => {
   const [selectedStock, setSelectedStock] = useState(null);
   const [quantityToAdd, setQuantityToAdd] = useState('');
 
-  // MODIFIED: fetchInventory now takes search params and uses them in the API call
   const fetchInventory = useCallback(async (searchParams = {}) => {
     try {
       setLoading(true);
@@ -38,18 +34,17 @@ const Inventory = () => {
   }, []);
 
   useEffect(() => {
-    fetchInventory(); // Initial fetch with no params
+    fetchInventory(); 
   }, [fetchInventory]);
 
-  // ADDED: Handler for the search form submission
   const handleSearch = (e) => {
     e.preventDefault();
     const params = {};
+    if (typeSearch) params.search_type = typeSearch;
     if (qualitySearch) params.search_quality = qualitySearch;
     if (colorSearch) params.search_color = colorSearch;
     fetchInventory(params);
   };
-
 
   const handleNewStockChange = (e) => {
     setNewStock(prevState => ({ ...prevState, [e.target.name]: e.target.value }));
@@ -104,25 +99,30 @@ const Inventory = () => {
         <button onClick={() => setIsNewStockModalOpen(true)} className="button">Add New Stock Type</button>
       </div>
 
-      {/* --- ADDED: Search Form --- */}
       <Card>
         <form onSubmit={handleSearch} className="search-form-grid">
+          {/* ADDED: Type Search Input */}
+          <div className="form-group">
+              <label>Stock Type</label>
+              <input type="text" value={typeSearch}
+                     onChange={(e) => setTypeSearch(e.target.value)}
+                     placeholder="e.g. Wool, Silk..." />
+          </div>
           <div className="form-group">
               <label>Quality</label>
               <input type="text" value={qualitySearch}
                      onChange={(e) => setQualitySearch(e.target.value)}
-                     placeholder="Search by quality..." />
+                     placeholder="e.g. 60x60..." />
           </div>
           <div className="form-group">
               <label>Color / Shade #</label>
               <input type="text" value={colorSearch}
                      onChange={(e) => setColorSearch(e.target.value)}
-                     placeholder="Search by color/shade..." />
+                     placeholder="e.g. Red, 102..." />
           </div>
           <button type="submit" className="button">Search</button>
         </form>
       </Card>
-
 
       <Card>
         <table className="styled-table">
@@ -142,6 +142,7 @@ const Inventory = () => {
         </table>
       </Card>
 
+      {/* Modals remain unchanged */}
       <Modal isOpen={isNewStockModalOpen} onClose={closeModals} title="Add New Stock Type">
         <form onSubmit={handleAddNewStock}>
           <div className="form-group"><label>Stock Type*</label><input type="text" name="Type" value={newStock.Type} onChange={handleNewStockChange} required /></div>
@@ -153,7 +154,7 @@ const Inventory = () => {
         </form>
       </Modal>
 
-      <Modal isOpen={isAddQuantityModalOpen} onClose={closeModals} title={`Add Quantity to ${selectedStock?.Type} (${selectedStock?.Quality}) ${selectedStock?.ColorShadeNumber || ''}`}>
+      <Modal isOpen={isAddQuantityModalOpen} onClose={closeModals} title={`Add Quantity to ${selectedStock?.Type} (${selectedStock?.Quality})`}>
         <form onSubmit={handleAddQuantity}>
            <p>Current Quantity: <strong>{selectedStock?.QuantityInStockKg.toFixed(3)} kg</strong></p>
            <div className="form-group"><label>Quantity to Add (Kg)</label><input type="number" step="0.001" value={quantityToAdd} onChange={(e) => setQuantityToAdd(e.target.value)} required autoFocus /></div>
